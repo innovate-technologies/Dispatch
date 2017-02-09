@@ -29,4 +29,6 @@ app.put("/v1/unit", wrap((req, res) => {
 
 
 
-app.listen(config.bindIP + ":" + config.bindPort)
+app.listen(config.bindPath, () => {
+    console.log(`Listening on ${config.bindPath}`)
+})
