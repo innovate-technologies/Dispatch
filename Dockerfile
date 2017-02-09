@@ -2,9 +2,8 @@ FROM debian:jessie
 
 RUN echo "deb http://ftp.debian.org/debian jessie-backports main" >>/etc/apt/sources.list
 RUN apt-get update && apt-get -y upgrade && apt-get -y install curl git
-RUN curl -sL https://deb.nodesource.com/setup_6.x | bash - && apt-get install nodejs
-
 RUN apt-get -y install -t jessie-backports golang
+
 RUN cd /usr/src/ && git clone https://github.com/coreos/etcd.git -b release-2.3 && \
     cd /usr/src/etcd && \
     ./build && \
