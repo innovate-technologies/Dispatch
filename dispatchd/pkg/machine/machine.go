@@ -33,7 +33,6 @@ func RegisterMachine() {
 
 	go renewAlive()
 	go updateLoad()
-	time.Sleep(1000 * time.Second) // to be removed
 }
 
 func renewAlive() {
