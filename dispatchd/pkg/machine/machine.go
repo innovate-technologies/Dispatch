@@ -24,7 +24,7 @@ var (
 func RegisterMachine() {
 	setUpEtcd()
 
-	machineLocation = fmt.Sprintf("/dispatch/machine/%s", Config.MachineName)
+	machineLocation = fmt.Sprintf("/dispatch/machines/%s/%s", Config.Zone, Config.MachineName)
 
 	etcdAPI.Set(ctx, machineLocation+"/arch", Config.Arch, &etcd.SetOptions{})
 	etcdAPI.Set(ctx, machineLocation+"/ip", Config.PublicIP, &etcd.SetOptions{})
