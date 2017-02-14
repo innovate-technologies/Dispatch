@@ -3,8 +3,10 @@ package main
 import (
 	"fmt"
 
+	"./pkg/apiserver"
 	"./pkg/config"
 	"./pkg/machine"
+	"./pkg/supervisor"
 )
 
 var configuration config.ConfigurationInfo
@@ -17,5 +19,9 @@ func main() {
 	fmt.Println(configuration.MachineName)
 
 	machine.Config = &configuration
+	supervisor.Config = &configuration
+
 	machine.RegisterMachine()
+	supervisor.Run()
+	apiserver.Run()
 }
