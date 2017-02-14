@@ -1,5 +1,5 @@
 {
-    "machineName":"Test",
     "publicIP": "127.0.0.1",
-    "arch": "amd64"
+    "arch": "amd64",
+    "zone": "mbp"
 }

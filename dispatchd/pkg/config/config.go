@@ -14,6 +14,7 @@ type ConfigurationInfo struct {
 	BindPort    int               `json:"bindPort"`
 	EtcdAddress string            `json:"etcdAddress"`
 	PublicIP    string            `json:"publicIP"`
+	Zone        string            `json:"zone"`
 }
 
 func newConfigurationInfo() ConfigurationInfo {
@@ -22,6 +23,7 @@ func newConfigurationInfo() ConfigurationInfo {
 	config.BindIP = "127.0.0.1"
 	config.BindPort = 7384 // "IT" in ASCII to decimal
 	config.EtcdAddress = "http://127.0.0.1:2379"
+	config.Zone = "dc"
 	return config
 }
 
