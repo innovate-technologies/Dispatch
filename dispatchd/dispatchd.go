@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"./pkg/apiserver"
+	"./pkg/command"
 	"./pkg/config"
 	"./pkg/machine"
 	"./pkg/supervisor"
@@ -20,8 +21,11 @@ func main() {
 
 	machine.Config = &configuration
 	supervisor.Config = &configuration
+	command.Config = &configuration
 
 	machine.RegisterMachine()
 	supervisor.Run()
+	command.Run()
+
 	apiserver.Run()
 }
