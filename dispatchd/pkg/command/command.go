@@ -19,8 +19,8 @@ var (
 	ctx     = context.Background()
 	etcdAPI etcd.KeysAPI
 	// Config is a pointer need to be set to the main configuration
-	Config      *config.ConfigurationInfo
-	writeToEtcd sync.Mutex
+	Config    *config.ConfigurationInfo
+	etcdMutex sync.Mutex
 )
 
 // Run starts watching for commands to execute
@@ -74,11 +74,11 @@ func readSdtToEtcd(key string, std *bufio.Reader) {
 		if err != nil {
 			return // end of stream
 		}
-		writeToEtcd.Lock()
+		etcdMutex.Lock()
 		response, _ := etcdAPI.Get(ctx, outputPath, &etcd.GetOptions{})
 		output := response.Node.Value + string(line[:]) + "\n"
 		etcdAPI.Set(ctx, outputPath, output, &etcd.SetOptions{})
-		writeToEtcd.Unlock()
+		etcdMutex.Unlock()
 	}
 }
 
