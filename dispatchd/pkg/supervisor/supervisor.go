@@ -17,8 +17,7 @@ var (
 	// Config is a pointer need to be set to the main configuration
 	Config *config.ConfigurationInfo
 	// IsSupervisor indicates if this machine is the supervisor
-	IsSupervisor         = false
-	machinesBeingWatched []string
+	IsSupervisor = false
 )
 
 // Run checks for a supervisor and becomes supervisor when needed
@@ -96,15 +95,6 @@ func watchToBecomeSupervisor() {
 }
 
 func watchMachines() {
-	response, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/machines/%s/", Config.Zone), &etcd.GetOptions{})
-	if err != nil {
-		panic(err)
-	}
-
-	for _, node := range response.Node.Nodes {
-		go watchMachineState(node.Key)
-		machinesBeingWatched = append(machinesBeingWatched, node.Key)
-	}
 	w := etcdAPI.Watcher(fmt.Sprintf("/dispatch/machines/%s/", Config.Zone), &etcd.WatcherOptions{Recursive: true})
 	for {
 		r, err := w.Next(ctx)
@@ -113,30 +103,9 @@ func watchMachines() {
 			return
 		}
 		keyComponents := strings.Split(r.Node.Key, "/")
-		if r.Action == "set" && keyComponents[len(keyComponents)-1] == "alive" {
-			watchMachineState(strings.Join(keyComponents[:len(keyComponents)-1], "/"))
-		}
-	}
-}
-
-func watchMachineState(machineKey string) {
-	fmt.Println("Watching", machineKey)
-	_, err := etcdAPI.Get(ctx, fmt.Sprintf("%s/alive", machineKey), &etcd.GetOptions{})
-	if err != nil {
-		fmt.Println(machineKey, "dead at arrival")
-		etcdAPI.Delete(ctx, machineKey, &etcd.DeleteOptions{Recursive: true, Dir: true})
-		return
-	}
-	w := etcdAPI.Watcher(fmt.Sprintf("%s/alive", machineKey), &etcd.WatcherOptions{})
-	for {
-		r, err := w.Next(ctx)
-		if err != nil {
-			go watchMachineState(machineKey)
-			return
-		}
-		if r.Action == "expire" {
-			fmt.Println(machineKey, "died")
-			etcdAPI.Delete(ctx, machineKey, &etcd.DeleteOptions{Recursive: true, Dir: true})
+		if r.Action == "expire" && keyComponents[len(keyComponents)-1] == "alive" {
+			fmt.Println(keyComponents[len(keyComponents)-2], "died")
+			etcdAPI.Delete(ctx, strings.Join(keyComponents[:len(keyComponents)-1], "/"), &etcd.DeleteOptions{Recursive: true, Dir: true})
 		}
 	}
 }
