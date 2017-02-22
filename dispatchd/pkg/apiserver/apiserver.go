@@ -1,16 +1,16 @@
 package apiserver
 
-import "github.com/gin-gonic/gin"
+import (
+	"net/http"
+
+	"gopkg.in/labstack/echo.v3"
+)
 
 // Run starts the HTTP server
 func Run() {
-	gin.SetMode(gin.ReleaseMode)
-
-	r := gin.Default()
-	r.GET("/ping", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"message": "pong",
-		})
+	e := echo.New()
+	e.GET("/", func(c echo.Context) error {
+		return c.String(http.StatusOK, "Hello, World!")
 	})
-	r.Run() // listen and serve on 0.0.0.0:8080
+	e.Logger.Fatal(e.Start(":1323"))
 }
