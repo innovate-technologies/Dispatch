@@ -5,7 +5,8 @@ go:
 os:
 - linux
 
-install: make get-deps
+install: 
+- cd dispatchd && go get && cd ..
 
 script:
 - go build dispatchd/dispatchd.go
