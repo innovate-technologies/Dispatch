@@ -9,3 +9,4 @@ install: make get-deps
 
 script:
 - go build dispatchd/dispatchd.go
+- GOARCH=arm go build dispatchd/dispatchd.go
