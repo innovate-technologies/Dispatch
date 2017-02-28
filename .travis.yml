@@ -1,13 +1,13 @@
 language: go
 go:
   - 1.8
+sudo: required
+services:
+  - docker
 
-os:
-- linux
-
-install: 
-- cd dispatchd && go get && cd ..
+before_install:
+  - docker login -u="$DOCKER_USERNAME" -p="$DOCKER_PASSWORD"
 
 script:
-- go build dispatchd/dispatchd.go
-- GOARCH=arm go build dispatchd/dispatchd.go
+  - docker build -t innovate/dispatch ./
+  - if [ "$TRAVIS_BRANCH" == "master" ]; then docker push innovate/dispatch; fi
