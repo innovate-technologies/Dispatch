@@ -95,6 +95,7 @@ func watchToBecomeSupervisor() {
 }
 
 func watchMachines() {
+	go checkForDeadMachines() // clean out the dead on arrival ones
 	w := etcdAPI.Watcher(fmt.Sprintf("/dispatch/machines/%s/", Config.Zone), &etcd.WatcherOptions{Recursive: true})
 	for {
 		r, err := w.Next(ctx)
@@ -106,6 +107,21 @@ func watchMachines() {
 		if r.Action == "expire" && keyComponents[len(keyComponents)-1] == "alive" {
 			fmt.Println(keyComponents[len(keyComponents)-2], "died")
 			etcdAPI.Delete(ctx, strings.Join(keyComponents[:len(keyComponents)-1], "/"), &etcd.DeleteOptions{Recursive: true, Dir: true})
+		}
+	}
+}
+
+func checkForDeadMachines() {
+	response, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/machines/%s/", Config.Zone), &etcd.GetOptions{})
+	if err != nil {
+		return //not important for now
+	}
+	for _, node := range response.Node.Nodes {
+		_, err := etcdAPI.Get(ctx, fmt.Sprintf("%s/alive", node.Key), &etcd.GetOptions{})
+		if err != nil {
+			fmt.Println(node.Key, "dead at arrival")
+			etcdAPI.Delete(ctx, node.Key, &etcd.DeleteOptions{Recursive: true, Dir: true})
+			return
 		}
 	}
 }
