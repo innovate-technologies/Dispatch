@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"../config"
+	"../unit"
 
 	etcd "github.com/coreos/etcd/client"
 	"golang.org/x/net/context"
@@ -24,6 +25,8 @@ var (
 func RegisterMachine() {
 	setUpEtcd()
 
+	unit.Config = Config // pass throug the config
+
 	machineLocation = fmt.Sprintf("/dispatch/machines/%s/%s", Config.Zone, Config.MachineName)
 
 	etcdAPI.Set(ctx, machineLocation+"/arch", Config.Arch, &etcd.SetOptions{})
@@ -33,6 +36,7 @@ func RegisterMachine() {
 
 	go renewAlive()
 	go updateLoad()
+	go startUnits()
 }
 
 func renewAlive() {
@@ -68,4 +72,27 @@ func setUpEtcd() {
 
 func setTags(tags map[string]string) {
 
+}
+
+func startUnits() {
+	result, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/machines/%s/%s/units", Config.Zone, Config.MachineName), &etcd.GetOptions{Recursive: true})
+	if err == nil {
+		for _, node := range result.Node.Nodes {
+			u := unit.NewFromEtcd(node.Value)
+			u.Start()
+		}
+	}
+	go watchUnits()
+}
+
+func watchUnits() {
+	w := etcdAPI.Watcher(machineLocation+"/units", &etcd.WatcherOptions{Recursive: true})
+	for {
+		r, err := w.Next(ctx)
+		if err != nil {
+			go watchUnits()
+			return
+		}
+		fmt.Println(r)
+	}
 }
