@@ -1,5 +1,7 @@
 package state
 
+import "fmt"
+
 // State represets the state of a unit
 type State int
 
@@ -28,12 +30,13 @@ func (s State) String() string {
 	return nameStrings[s]
 }
 
-// StateForString sends back the state for the given string
+// ForString sends back the state for the given string
 func ForString(name string) State {
 	for index, value := range nameStrings {
 		if name == value {
 			return statePerInt[index]
 		}
 	}
+	fmt.Println(name)
 	return Dead // if no match has been found
 }

@@ -3,6 +3,7 @@ package unit
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"time"
 
 	"../config"
@@ -44,7 +45,7 @@ func New() Unit {
 			panic(err)
 		}
 	}
-	return Unit{onEtcd: false}
+	return Unit{}
 }
 
 // NewFromEtcd creates a new unit with info from etcd
@@ -62,17 +63,31 @@ func NewFromEtcd(name string) Unit {
 
 // Start starts the specific unit
 func (unit *Unit) Start() {
-	fmt.Println("TO DO start", unit.Name)
+	unit.setState(state.Starting)
+	c := make(chan string)
+	dbusConnection.StartUnit(unit.Name, "fail", c)
+	result := <-c
+	if result == "done" {
+		unit.setState(state.Active)
+	} else {
+		unit.setState(state.Dead)
+	}
 }
 
 // Stop stops the unit
 func (unit *Unit) Stop() {
-	fmt.Println("TO DO")
+	c := make(chan string)
+	dbusConnection.StopUnit(unit.Name, "fail", c)
+	result := <-c
+	if result == "done" {
+		unit.setState(state.Dead)
+	}
 }
 
 // Restart restarts the unit
 func (unit *Unit) Restart() {
-	fmt.Println("TO DO")
+	unit.Stop()
+	unit.Start()
 }
 
 // Create writes the unit to the disk
@@ -86,11 +101,32 @@ func (unit *Unit) Create() {
 	}
 	unit.onDisk = true
 	dbusConnection.LinkUnitFiles([]string{thisUnitPath}, true, true)
+	dbusConnection.Reload()
 }
 
 // Destroy destroys the given unit
 func (unit *Unit) Destroy() {
-	fmt.Println("TO DO")
+	os.Remove(unitPath + unit.Name)
+	unit.onDisk = false
+	dbusConnection.Reload()
+}
+
+// LoadAndWatch loads the unit to the system and follows the desired state
+func (unit *Unit) LoadAndWatch() {
+	if !unit.onDisk {
+		unit.Create()
+	}
+	unit.becomeDesiredState()
+	go unit.Watch()
+}
+
+func (unit *Unit) becomeDesiredState() {
+	fmt.Println("desiredstate:", unit.DesiredState)
+	if unit.DesiredState == state.Active {
+		unit.Start()
+	} else if unit.DesiredState == state.Dead {
+		unit.Stop()
+	}
 }
 
 // Watch creates and etcd watcher for the desired state of a specific unit
@@ -102,7 +138,10 @@ func (unit *Unit) Watch() {
 			go unit.Watch()
 			return
 		}
-		fmt.Println(r)
+		if r.Action == "set" {
+			unit.DesiredState = state.ForString(r.Node.Value)
+			unit.becomeDesiredState()
+		}
 	}
 }
 
@@ -112,6 +151,11 @@ func (unit *Unit) getKeyFromEtcd(key string) string {
 		return ""
 	}
 	return response.Node.Value
+}
+
+func (unit *Unit) setState(s state.State) {
+	unit.State = s
+	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/units/%s/%s/state", Config.Zone, unit.Name), s.String(), &etcd.SetOptions{})
 }
 
 func setUpEtcd() {

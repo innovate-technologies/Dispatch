@@ -14,5 +14,18 @@ rm -f /lib/systemd/system/plymouth*; \
 rm -f /lib/systemd/system/systemd-update-utmp*;
 RUN systemctl set-default multi-user.target
 ENV init /lib/systemd/systemd
+
+RUN apt-get update && apt-get -y upgrade && apt-get -y install curl wget git tar
+RUN cd /tmp && wget https://storage.googleapis.com/golang/go1.8.linux-amd64.tar.gz && tar -C /usr/local -xzf go1.8.linux-amd64.tar.gz 
+ENV PATH=$PATH:/usr/local/go/bin
+
+RUN cd /usr/src/ && git clone https://github.com/coreos/etcd.git -b release-2.3 && \
+    cd /usr/src/etcd && \
+    ./build && \
+    ln -s /usr/src/etcd/bin/* /usr/bin/
+
+ENV DISCOVER=shoutca.st
+
+
 VOLUME [ "/sys/fs/cgroup" ]
 ENTRYPOINT ["/lib/systemd/systemd"]
