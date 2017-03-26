@@ -101,9 +101,11 @@ func watchUnits() {
 			u.LoadAndWatch()
 			units[r.Node.Value] = u
 		}
-		if unit, exists := units[r.PrevNode.Value]; exists && r.Action == "delete" {
-			unit.Destroy()
-			delete(units, r.PrevNode.Value)
+		if r.Action == "delete" {
+			if unit, exists := units[r.PrevNode.Value]; exists {
+				unit.Destroy()
+				delete(units, r.PrevNode.Value)
+			}
 		}
 	}
 }
