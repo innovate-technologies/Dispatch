@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"../config"
+	"./queue"
 
 	etcd "github.com/coreos/etcd/client"
 	"golang.org/x/net/context"
@@ -65,12 +66,14 @@ func becomeSupervisor() {
 	IsSupervisor = true
 	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/supervisor/%s/alive", Config.Zone), "1", &etcd.SetOptions{TTL: 10 * time.Second})
 	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/supervisor/%s/machine", Config.Zone), Config.MachineName, &etcd.SetOptions{})
-	go letPeasantKnow()
+	go letPeasantsKnow()
 	go watchMachines()
+	queue.Config = Config
+	go queue.Run()
 }
 
-// letPesantsKnow makes sure everybody knows you're not dead
-func letPeasantKnow() {
+// letPeasantsKnow makes sure everybody knows you're not dead
+func letPeasantsKnow() {
 	for {
 		etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/supervisor/%s/alive", Config.Zone), "", &etcd.SetOptions{TTL: 10 * time.Second, Refresh: true})
 		time.Sleep(1 * time.Second)
@@ -106,7 +109,7 @@ func watchMachines() {
 		keyComponents := strings.Split(r.Node.Key, "/")
 		if r.Action == "expire" && keyComponents[len(keyComponents)-1] == "alive" {
 			fmt.Println(keyComponents[len(keyComponents)-2], "died")
-			etcdAPI.Delete(ctx, strings.Join(keyComponents[:len(keyComponents)-1], "/"), &etcd.DeleteOptions{Recursive: true, Dir: true})
+			foundDeadMachine(strings.Join(keyComponents[:len(keyComponents)-1], "/"))
 		}
 	}
 }
@@ -120,10 +123,19 @@ func checkForDeadMachines() {
 		_, err := etcdAPI.Get(ctx, fmt.Sprintf("%s/alive", node.Key), &etcd.GetOptions{})
 		if err != nil {
 			fmt.Println(node.Key, "dead at arrival")
-			etcdAPI.Delete(ctx, node.Key, &etcd.DeleteOptions{Recursive: true, Dir: true})
-			return
+			foundDeadMachine(node.Key)
 		}
 	}
+}
+
+func foundDeadMachine(key string) {
+	result, err := etcdAPI.Get(ctx, key+"/units", &etcd.GetOptions{Recursive: true})
+	if err == nil {
+		for _, node := range result.Node.Nodes {
+			go queue.AddUnit(node.Value)
+		}
+	}
+	etcdAPI.Delete(ctx, key, &etcd.DeleteOptions{Recursive: true, Dir: true})
 }
 
 func setUpEtcd() {

@@ -26,7 +26,7 @@ var (
 func RegisterMachine() {
 	setUpEtcd()
 
-	unit.Config = Config           // pass throug the config
+	unit.Config = Config           // pass through the config
 	units = map[string]unit.Unit{} // initialize map
 
 	machineLocation = fmt.Sprintf("/dispatch/machines/%s/%s", Config.Zone, Config.MachineName)
@@ -53,7 +53,7 @@ func updateLoad() {
 		out, err := exec.Command("uptime").Output()
 		if err == nil {
 			uptimeString := fmt.Sprintf("%s", out)
-			load := strings.Split((strings.Split(uptimeString, "load average: ")[1]), ",")[0]
+			load := strings.Split((strings.Split(uptimeString, "load average: ")[1]), ",")[0] //to do: divide #CPU
 			etcdAPI.Set(ctx, machineLocation+"/load", load, &etcd.SetOptions{})
 		}
 		time.Sleep(1 * time.Second)
