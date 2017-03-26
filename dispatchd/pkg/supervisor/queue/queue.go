@@ -69,14 +69,20 @@ func getMachineForConstraints(contraints map[string]string) string {
 	machinesForLoad := map[string]float64{}
 	response, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/machines/%s/", Config.Zone), &etcd.GetOptions{Recursive: true})
 	if err != nil {
+		fmt.Println(err)
 		return "" //not important for now
 	}
 	for _, node := range response.Node.Nodes {
-		keyParts := strings.Split(node.Key, "/")
-		if keyParts[len(keyParts)-1] == "load" {
-			if load, err := strconv.ParseFloat(keyParts[len(keyParts)-1], 64); err == nil {
-				// TO DO ADD CONTRAINTS
-				machinesForLoad[keyParts[len(keyParts)-2]] = load
+		for _, key := range node.Nodes {
+			keyParts := strings.Split(key.Key, "/")
+			fmt.Println(keyParts[len(keyParts)-1])
+			if keyParts[len(keyParts)-1] == "load" {
+				load, err := strconv.ParseFloat(key.Value, 64)
+				fmt.Println(err)
+				if err == nil {
+					// TO DO ADD CONTRAINTS
+					machinesForLoad[keyParts[len(keyParts)-2]] = load
+				}
 			}
 		}
 	}
