@@ -99,6 +99,9 @@ func (unit *Unit) Create() {
 	if err != nil {
 		panic(err)
 	}
+	c := make(chan string)
+	dbusConnection.StopUnit(unit.Name, "fail", c) // stop unit to make sure new one is loaded
+	<-c
 	unit.onDisk = true
 	dbusConnection.LinkUnitFiles([]string{thisUnitPath}, true, true)
 	dbusConnection.Reload()
