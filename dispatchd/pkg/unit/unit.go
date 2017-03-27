@@ -4,7 +4,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 	"time"
+
+	"strconv"
 
 	"../config"
 	"./state"
@@ -29,7 +32,7 @@ type Unit struct {
 	Machine      string
 	State        state.State
 	DesiredState state.State
-	Ports        []int
+	Ports        []int64
 	Constraints  map[string]string
 	UnitContent  string
 	onEtcd       bool
@@ -58,6 +61,16 @@ func NewFromEtcd(name string) Unit {
 	unit.State = state.Dead
 	unit.UnitContent = getKeyFromEtcd(name, "unit")
 	unit.DesiredState = state.ForString(getKeyFromEtcd(name, "desiredState"))
+
+	unit.Ports = []int64{}
+	portsStringArray := strings.Split(getKeyFromEtcd(name, "ports"), ",")
+	for _, portString := range portsStringArray {
+		port, err := strconv.ParseInt(portString, 10, 64)
+		if err == nil {
+			unit.Ports = append(unit.Ports, port)
+		}
+	}
+
 	return unit
 }
 

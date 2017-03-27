@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"../../config"
+	"../../unit"
 
 	"strconv"
 
@@ -61,29 +62,63 @@ func watchQueue() {
 
 func assignUnit(name string) {
 	fmt.Println(name)
-	machine := getMachineForConstraints(map[string]string{}) // TO DO implement constraints
+	newUnit := unit.NewFromEtcd(name)
+	machine := getMachineForConstraints(map[string]string{}, newUnit.Ports) // TO DO implement constraints
 	assignUnitToMachine(name, machine)
 }
 
-func getMachineForConstraints(contraints map[string]string) string {
+func getMachineForConstraints(contraints map[string]string, ports []int64) string {
 	machinesForLoad := map[string]float64{}
 	response, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/machines/%s/", Config.Zone), &etcd.GetOptions{Recursive: true})
 	if err != nil {
 		fmt.Println(err)
 		return "" //not important for now
 	}
-	for _, node := range response.Node.Nodes {
-		for _, key := range node.Nodes {
+	for _, machine := range response.Node.Nodes {
+		machineNameParts := strings.Split(machine.Key, "/")
+
+		machineName := machineNameParts[len(machineNameParts)-1]
+		var load float64
+		unitNames := []string{}
+
+		for _, key := range machine.Nodes {
 			keyParts := strings.Split(key.Key, "/")
-			fmt.Println(keyParts[len(keyParts)-1])
 			if keyParts[len(keyParts)-1] == "load" {
-				load, err := strconv.ParseFloat(key.Value, 64)
-				fmt.Println(err)
-				if err == nil {
-					// TO DO ADD CONTRAINTS
-					machinesForLoad[keyParts[len(keyParts)-2]] = load
+				load, _ = strconv.ParseFloat(key.Value, 64)
+			}
+			if keyParts[len(keyParts)-1] == "units" {
+				for _, unit := range key.Nodes {
+					unitNames = append(unitNames, unit.Value)
 				}
 			}
+		}
+
+		goCount := 0
+		unitChan := make(chan unit.Unit)
+		units := []unit.Unit{}
+		for _, unitName := range unitNames {
+			go getUnit(unitName, unitChan)
+			goCount++
+		}
+		for goCount > 0 {
+			unit := <-unitChan
+			units = append(units, unit)
+			goCount--
+		}
+		allPortsAvailable := true
+	L:
+		for _, unit := range units {
+			for _, unitPort := range unit.Ports {
+				for _, port := range ports {
+					if unitPort == port {
+						allPortsAvailable = false
+						break L
+					}
+				}
+			}
+		}
+		if allPortsAvailable {
+			machinesForLoad[machineName] = load
 		}
 	}
 	isCompared := false
@@ -97,6 +132,10 @@ func getMachineForConstraints(contraints map[string]string) string {
 		}
 	}
 	return lowestLoadMachine
+}
+
+func getUnit(name string, out chan unit.Unit) {
+	out <- unit.NewFromEtcd(name)
 }
 
 func assignUnitToMachine(unit, machine string) {
