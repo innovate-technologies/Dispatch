@@ -120,6 +120,28 @@ func (unit *Unit) Create() {
 	dbusConnection.Reload()
 }
 
+// PutOnQueue places a specific unit on the queue
+func (unit *Unit) PutOnQueue() {
+	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/queue/%s/%s/", Config.Zone, unit.Name), unit.Name, &etcd.SetOptions{})
+}
+
+// SaveOnEtcd saves the unit to etcd
+func (unit *Unit) SaveOnEtcd() {
+	setUpEtcd()
+
+	setKeyOnEtcd(unit.Name, "name", unit.Name)
+	setKeyOnEtcd(unit.Name, "unit", unit.UnitContent)
+	setKeyOnEtcd(unit.Name, "desiredState", unit.DesiredState.String())
+
+	portStrings := []string{}
+	for port := range unit.Ports {
+		portStrings = append(portStrings, strconv.Itoa(port))
+	}
+	setKeyOnEtcd(unit.Name, "ports", strings.Join(portStrings, ","))
+
+	unit.onEtcd = true
+}
+
 // Destroy destroys the given unit
 func (unit *Unit) Destroy() {
 	os.Remove(unitPath + unit.Name)
@@ -195,4 +217,8 @@ func getKeyFromEtcd(unit, key string) string {
 		return ""
 	}
 	return response.Node.Value
+}
+
+func setKeyOnEtcd(unit, key, content string) {
+	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/templates/%s/%s/%s", Config.Zone, unit, key), content, &etcd.SetOptions{})
 }
