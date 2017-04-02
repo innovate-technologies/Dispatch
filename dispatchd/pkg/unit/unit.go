@@ -30,6 +30,7 @@ var (
 type Unit struct {
 	Name         string
 	Machine      string
+	Template     string
 	State        state.State
 	DesiredState state.State
 	Ports        []int64
@@ -58,6 +59,7 @@ func NewFromEtcd(name string) Unit {
 	unit.onEtcd = true
 	unit.Name = name
 	unit.Machine = getKeyFromEtcd(name, "machine")
+	unit.Template = getKeyFromEtcd(name, "template")
 	unit.State = state.Dead
 	unit.UnitContent = getKeyFromEtcd(name, "unit")
 	unit.DesiredState = state.ForString(getKeyFromEtcd(name, "desiredState"))
@@ -131,6 +133,7 @@ func (unit *Unit) SaveOnEtcd() {
 
 	setKeyOnEtcd(unit.Name, "name", unit.Name)
 	setKeyOnEtcd(unit.Name, "unit", unit.UnitContent)
+	setKeyOnEtcd(unit.Name, "template", unit.Template)
 	setKeyOnEtcd(unit.Name, "desiredState", unit.DesiredState.String())
 
 	portStrings := []string{}
