@@ -68,6 +68,7 @@ func becomeSupervisor() {
 	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/supervisor/%s/machine", Config.Zone), Config.MachineName, &etcd.SetOptions{})
 	go letPeasantsKnow()
 	go watchMachines()
+	go watchGlobals()
 	queue.Config = Config
 	go queue.Run()
 }
@@ -103,13 +104,23 @@ func watchMachines() {
 	for {
 		r, err := w.Next(ctx)
 		if err != nil {
-			fmt.Println("Oops.... this has yet to be designed. Consider me dead please")
+			watchMachines()
 			return
 		}
-		keyComponents := strings.Split(r.Node.Key, "/")
-		if r.Action == "expire" && keyComponents[len(keyComponents)-1] == "alive" {
-			fmt.Println(keyComponents[len(keyComponents)-2], "died")
-			foundDeadMachine(strings.Join(keyComponents[:len(keyComponents)-1], "/"))
+
+		if keyComponents := strings.Split(r.Node.Key, "/"); keyComponents[len(keyComponents)-1] == "alive" {
+			machineKey := strings.Join(keyComponents[:len(keyComponents)-1], "/")
+			// if died
+			if r.Action == "expire" {
+				fmt.Println(keyComponents[len(keyComponents)-2], "died")
+				foundDeadMachine(machineKey)
+			}
+
+			// if new
+			if r.Action == "set" {
+				fmt.Println(keyComponents[len(keyComponents)-2], "is alive")
+				foundNewMachine(machineKey)
+			}
 		}
 	}
 }
@@ -136,6 +147,16 @@ func foundDeadMachine(key string) {
 		}
 	}
 	etcdAPI.Delete(ctx, key, &etcd.DeleteOptions{Recursive: true, Dir: true})
+}
+
+func foundNewMachine(key string) {
+	// set globals
+	result, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/globals/%s/", Config.Zone), &etcd.GetOptions{Recursive: true})
+	if err == nil {
+		for _, node := range result.Node.Nodes {
+			go etcdAPI.Set(ctx, key+"/units/"+node.Value, node.Value, &etcd.SetOptions{})
+		}
+	}
 }
 
 func setUpEtcd() {

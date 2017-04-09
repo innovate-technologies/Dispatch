@@ -30,7 +30,8 @@ var (
 type Unit struct {
 	Name         string
 	Machine      string
-	Template     string
+	Template     string // is set with template name if from Template
+	Global       string // is set with global name if from global
 	State        state.State
 	DesiredState state.State
 	Ports        []int64
@@ -60,6 +61,7 @@ func NewFromEtcd(name string) Unit {
 	unit.Name = name
 	unit.Machine = getKeyFromEtcd(name, "machine")
 	unit.Template = getKeyFromEtcd(name, "template")
+	unit.Global = getKeyFromEtcd(name, "global")
 	unit.State = state.Dead
 	unit.UnitContent = getKeyFromEtcd(name, "unit")
 	unit.DesiredState = state.ForString(getKeyFromEtcd(name, "desiredState"))
@@ -134,6 +136,7 @@ func (unit *Unit) SaveOnEtcd() {
 	setKeyOnEtcd(unit.Name, "name", unit.Name)
 	setKeyOnEtcd(unit.Name, "unit", unit.UnitContent)
 	setKeyOnEtcd(unit.Name, "template", unit.Template)
+	setKeyOnEtcd(unit.Name, "global", unit.Global)
 	setKeyOnEtcd(unit.Name, "desiredState", unit.DesiredState.String())
 
 	portStrings := []string{}
@@ -142,14 +145,23 @@ func (unit *Unit) SaveOnEtcd() {
 	}
 	setKeyOnEtcd(unit.Name, "ports", strings.Join(portStrings, ","))
 
+	if unit.Global != "" {
+		etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/globals/%s/%s", Config.Zone, unit.Name), unit.Name, &etcd.SetOptions{})
+	}
+
 	unit.onEtcd = true
 }
 
 // Destroy destroys the given unit
 func (unit *Unit) Destroy() {
+	unit.Stop() // just making sure
 	os.Remove(unitPath + unit.Name)
 	unit.onDisk = false
 	dbusConnection.Reload()
+	etcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/units/%s/%s", Config.Zone, unit.Name), &etcd.DeleteOptions{Recursive: true})
+	if unit.Global != "" {
+		etcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/globals/%s/%s", Config.Zone, unit.Name), &etcd.DeleteOptions{})
+	}
 }
 
 // LoadAndWatch loads the unit to the system and follows the desired state
@@ -195,6 +207,9 @@ func (unit *Unit) getKeyFromEtcd(key string) string {
 }
 
 func (unit *Unit) setState(s state.State) {
+	if unit.Global != "" {
+		return
+	}
 	unit.State = s
 	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/units/%s/%s/state", Config.Zone, unit.Name), s.String(), &etcd.SetOptions{})
 }
