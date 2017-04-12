@@ -28,17 +28,35 @@ var (
 
 // Unit is a struct containing all info of a specific unit
 type Unit struct {
-	Name         string
-	Machine      string
-	Template     string // is set with template name if from Template
-	Global       string // is set with global name if from global
+	Name         string `json:"name"`
+	Machine      string `json:"machine"`
+	Template     string `json:"template,omitempty"` // is set with template name if from Template
+	Global       string `json:"global,omitempty"`   // is set with global name if from global
 	State        state.State
 	DesiredState state.State
-	Ports        []int64
+	Ports        []int64 `json:"ports"`
 	Constraints  map[string]string
-	UnitContent  string
+	UnitContent  string `json:"unitContent"`
 	onEtcd       bool
 	onDisk       bool
+}
+
+// GetAll returns all units in our zone
+func GetAll() ([]Unit, error) {
+	setUpEtcd()
+	response, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/units/%s", Config.Zone), &etcd.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	units := []Unit{}
+
+	for _, unitNode := range response.Node.Nodes {
+		pathParts := strings.Split(unitNode.Key, "/")
+		units = append(units, NewFromEtcd(pathParts[len(pathParts)-1]))
+	}
+
+	return units, nil
 }
 
 // New returns a new Unit
