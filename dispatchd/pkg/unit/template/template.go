@@ -1,10 +1,13 @@
 package template
 
 import (
+	"bytes"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
+
+	"text/template"
 
 	"../../config"
 	"../../unit"
@@ -23,6 +26,10 @@ type Template struct {
 	onEtcd        bool
 }
 
+type templateVariables struct { // TO DO: add more
+	Name string
+}
+
 var (
 	// Config is a pointer need to be set to the main configuration
 	Config  *config.ConfigurationInfo
@@ -33,6 +40,12 @@ var (
 // New returns a new blank Template
 func New() Template {
 	return Template{}
+}
+
+func newTemplateVariables(name string) templateVariables {
+	out := templateVariables{}
+	out.Name = name
+	return out
 }
 
 // NewFromEtcd creates a new Template with info from etcd
@@ -78,7 +91,13 @@ func (t *Template) NewUnit(name string) {
 	u.Template = t.Name
 	u.DesiredState = state.Active
 	u.Ports = t.Ports
-	u.UnitContent = t.UnitContent
+
+	// pars unit content
+	var unit bytes.Buffer
+	unitTemplate := template.New("unit template")
+	unitTemplate, _ = unitTemplate.Parse(t.UnitContent)
+	unitTemplate.Execute(&unit, newTemplateVariables(name))
+	u.UnitContent = unit.String()
 
 	u.SaveOnEtcd()
 	u.PutOnQueue()
