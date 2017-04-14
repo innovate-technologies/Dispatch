@@ -3,6 +3,7 @@ package queue
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"../../config"
@@ -18,7 +19,8 @@ var (
 	ctx     = context.Background()
 	etcdAPI etcd.KeysAPI
 	// Config is a pointer need to be set to the main configuration
-	Config *config.ConfigurationInfo
+	Config     *config.ConfigurationInfo
+	queueMutex *sync.Mutex
 )
 
 // Run checks for waiting units and assigns them
@@ -26,6 +28,7 @@ func Run() {
 	setUpEtcd()
 	importExisting()
 	go watchQueue()
+	go checkQueue() // make sure to not forget the unsatisfiable
 }
 
 // AddUnit adds a unit to the queue
@@ -36,7 +39,15 @@ func AddUnit(name string) {
 	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/queue/%s/%s", Config.Zone, name), name, &etcd.SetOptions{})
 }
 
+func checkQueue() {
+	for {
+		time.Sleep(5 * time.Second)
+		importExisting()
+	}
+}
+
 func importExisting() {
+	queueMutex.Lock()
 	response, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/queue/%s/", Config.Zone), &etcd.GetOptions{})
 	if err != nil {
 		return
@@ -44,6 +55,7 @@ func importExisting() {
 	for _, node := range response.Node.Nodes {
 		go assignUnit(node.Value)
 	}
+	queueMutex.Unlock()
 }
 
 func watchQueue() {
@@ -54,9 +66,11 @@ func watchQueue() {
 			go watchQueue()
 			return
 		}
+		queueMutex.Lock()
 		if r.Action == "set" {
 			go assignUnit(r.Node.Value)
 		}
+		queueMutex.Unlock()
 	}
 }
 
@@ -64,7 +78,9 @@ func assignUnit(name string) {
 	fmt.Println(name)
 	newUnit := unit.NewFromEtcd(name)
 	machine := getMachineForConstraints(map[string]string{}, newUnit.Ports) // TO DO implement constraints
-	assignUnitToMachine(name, machine)
+	if machine != "" {
+		assignUnitToMachine(name, machine)
+	}
 }
 
 func getMachineForConstraints(contraints map[string]string, ports []int64) string {
