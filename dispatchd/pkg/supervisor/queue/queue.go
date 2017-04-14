@@ -8,6 +8,7 @@ import (
 
 	"../../config"
 	"../../unit"
+	"../../unit/template"
 
 	"strconv"
 
@@ -77,13 +78,21 @@ func watchQueue() {
 func assignUnit(name string) {
 	fmt.Println(name)
 	newUnit := unit.NewFromEtcd(name)
-	machine := getMachineForConstraints(map[string]string{}, newUnit.Ports) // TO DO implement constraints
+	machine := getMachineForUnitConstraints(newUnit)
 	if machine != "" {
 		assignUnitToMachine(name, machine)
 	}
 }
 
-func getMachineForConstraints(contraints map[string]string, ports []int64) string {
+func getMachineForUnitConstraints(u unit.Unit) string {
+	// contraints := u.Constraints
+	ports := u.Ports
+	var unitTemplate template.Template
+	if u.Template != "" {
+		unitTemplate = template.NewFromEtcd(u.Template)
+	}
+
+	// TO DO implement constraints
 	machinesForLoad := map[string]float64{}
 	response, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/machines/%s/", Config.Zone), &etcd.GetOptions{Recursive: true})
 	if err != nil {
@@ -122,8 +131,15 @@ func getMachineForConstraints(contraints map[string]string, ports []int64) strin
 			goCount--
 		}
 		allPortsAvailable := true
+		var numSameTemplate int64
 	L:
 		for _, unit := range units {
+			// check template
+			if unit.Template == u.Template {
+				numSameTemplate++
+			}
+
+			// check ports
 			for _, unitPort := range unit.Ports {
 				for _, port := range ports {
 					if unitPort == port {
@@ -133,7 +149,7 @@ func getMachineForConstraints(contraints map[string]string, ports []int64) strin
 				}
 			}
 		}
-		if allPortsAvailable {
+		if allPortsAvailable && (numSameTemplate < unitTemplate.MaxPerMachine || unitTemplate.MaxPerMachine == 0) { // check ports and template constraints
 			machinesForLoad[machineName] = load
 		}
 	}
