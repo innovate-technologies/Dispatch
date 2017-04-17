@@ -4,7 +4,7 @@ go:
 install:
 - go get -d -v ./...
 - go vet ./...
-- cd dispatchd && go build -v ./
+- cd dispatchd && go build -v ./ && cd ..
 deploy:
   skip_cleanup: true
   provider: releases
@@ -14,4 +14,5 @@ deploy:
   overwrite: true
   on:
     repo: innovate-technologies/Dispatch
+    branch: "master"
     tags: true
