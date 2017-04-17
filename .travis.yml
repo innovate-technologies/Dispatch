@@ -1,10 +1,6 @@
-sudo: required
-services:
-  - docker
-
-before_install:
-  - docker login -u="$DOCKER_USERNAME" -p="$DOCKER_PASSWORD"
-
-script:
-  - docker build -t innovate/dispatch ./
-  - if [ "$TRAVIS_BRANCH" == "master" ]; then docker push innovate/dispatch; fi
+anguage: go
+go:
+  - 1.8
+install:
+  - "go get -d -v ./..."
+  - "go build -v ./..."
