@@ -9,9 +9,9 @@ import (
 
 	"text/template"
 
-	"github.com/innovate-technologies/Dispatch/dispatchdconfig"
-	"github.com/innovate-technologies/Dispatch/dispatchdunit"
-	"github.com/innovate-technologies/Dispatch/dispatchdunit/state"
+	"github.com/innovate-technologies/Dispatch/dispatchd/config"
+	"github.com/innovate-technologies/Dispatch/dispatchd/unit"
+	"github.com/innovate-technologies/Dispatch/dispatchd/unit/state"
 
 	etcd "github.com/coreos/etcd/client"
 	"golang.org/x/net/context"

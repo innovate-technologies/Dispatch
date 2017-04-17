@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/innovate-technologies/Dispatch/dispatchdconfig"
+	"github.com/innovate-technologies/Dispatch/dispatchd/config"
 
 	etcd "github.com/coreos/etcd/client"
 	"golang.org/x/net/context"

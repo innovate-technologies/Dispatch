@@ -3,11 +3,11 @@ package main
 import (
 	"fmt"
 
-	"github.com/innovate-technologies/Dispatch/dispatchdapiserver"
-	"github.com/innovate-technologies/Dispatch/dispatchdcommand"
-	"github.com/innovate-technologies/Dispatch/dispatchdconfig"
-	"github.com/innovate-technologies/Dispatch/dispatchdmachine"
-	"github.com/innovate-technologies/Dispatch/dispatchdsupervisor"
+	"github.com/innovate-technologies/Dispatch/dispatchd/apiserver"
+	"github.com/innovate-technologies/Dispatch/dispatchd/command"
+	"github.com/innovate-technologies/Dispatch/dispatchd/config"
+	"github.com/innovate-technologies/Dispatch/dispatchd/machine"
+	"github.com/innovate-technologies/Dispatch/dispatchd/supervisor"
 )
 
 var configuration config.ConfigurationInfo

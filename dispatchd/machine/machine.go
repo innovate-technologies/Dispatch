@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/innovate-technologies/Dispatch/dispatchdconfig"
-	"github.com/innovate-technologies/Dispatch/dispatchdunit"
+	"github.com/innovate-technologies/Dispatch/dispatchd/config"
+	"github.com/innovate-technologies/Dispatch/dispatchd/unit"
 
 	etcd "github.com/coreos/etcd/client"
 	"golang.org/x/net/context"

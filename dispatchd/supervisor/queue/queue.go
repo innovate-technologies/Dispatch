@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/innovate-technologies/Dispatch/dispatchdconfig"
-	"github.com/innovate-technologies/Dispatch/dispatchdunit"
-	"github.com/innovate-technologies/Dispatch/dispatchdunit/template"
+	"github.com/innovate-technologies/Dispatch/dispatchd/config"
+	"github.com/innovate-technologies/Dispatch/dispatchd/unit"
+	"github.com/innovate-technologies/Dispatch/dispatchd/unit/template"
 
 	"strconv"
 

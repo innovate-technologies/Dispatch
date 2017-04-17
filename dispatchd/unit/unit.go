@@ -9,8 +9,8 @@ import (
 
 	"strconv"
 
-	"github.com/innovate-technologies/Dispatch/dispatchdconfig"
-	"github.com/innovate-technologies/Dispatch/dispatchdunit/state"
+	"github.com/innovate-technologies/Dispatch/dispatchd/config"
+	"github.com/innovate-technologies/Dispatch/dispatchd/unit/state"
 
 	etcd "github.com/coreos/etcd/client"
 	"github.com/coreos/go-systemd/dbus"
