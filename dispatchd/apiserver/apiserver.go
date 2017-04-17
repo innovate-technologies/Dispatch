@@ -3,8 +3,8 @@ package apiserver
 import (
 	"net/http"
 
-	"dispatchd/unit"
-	state "dispatchd/unit/state"
+	"github.com/innovate-technologies/Dispatch/dispatchdunit"
+	state "github.com/innovate-technologies/Dispatch/dispatchdunit/state"
 
 	"gopkg.in/labstack/echo.v3"
 )

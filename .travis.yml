@@ -2,7 +2,6 @@ language: go
 go:
   - 1.8
 
-go_import_path: dispatchd/
 install:
   - "go get -d -v ./... || echo 0"
   - "go build -v ./..."
