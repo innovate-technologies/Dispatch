@@ -2,5 +2,5 @@ language: go
 go:
   - 1.8
 install:
-  - "go get -d -v ./... || exit 0"
+  - "go get -d -v ./... || echo 0"
   - "go build -v ./..."
