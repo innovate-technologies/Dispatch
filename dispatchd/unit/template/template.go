@@ -23,7 +23,7 @@ type Template struct {
 	Ports         []int64
 	Constraints   map[string]string
 	UnitContent   string
-	MaxPerMachine int64 // TO DO: implement this!
+	MaxPerMachine int64
 	onEtcd        bool
 }
 
