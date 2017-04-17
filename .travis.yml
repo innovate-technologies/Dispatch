@@ -3,5 +3,6 @@ go:
   - 1.8
 
 install:
-  - "go get -d -v ./... || echo 0"
-  - "go build -v ./..."
+  - "go get -d -v ./..."
+  - "go vet ./..."
+  - "go build -v dispatchd"
