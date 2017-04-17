@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"../../config"
-	"../../unit"
-	"../../unit/template"
+	"dispatchd/config"
+	"dispatchd/unit"
+	"dispatchd/unit/template"
 
 	"strconv"
 

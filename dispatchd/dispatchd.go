@@ -3,11 +3,11 @@ package main
 import (
 	"fmt"
 
-	"./pkg/apiserver"
-	"./pkg/command"
-	"./pkg/config"
-	"./pkg/machine"
-	"./pkg/supervisor"
+	"dispatchd/apiserver"
+	"dispatchd/command"
+	"dispatchd/config"
+	"dispatchd/machine"
+	"dispatchd/supervisor"
 )
 
 var configuration config.ConfigurationInfo
@@ -28,4 +28,5 @@ func main() {
 	command.Run()
 
 	apiserver.Run()
+
 }

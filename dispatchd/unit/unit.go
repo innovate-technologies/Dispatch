@@ -9,8 +9,9 @@ import (
 
 	"strconv"
 
-	"../config"
-	"./state"
+	"dispatchd/config"
+	"dispatchd/unit/state"
+
 	etcd "github.com/coreos/etcd/client"
 	"github.com/coreos/go-systemd/dbus"
 	"golang.org/x/net/context"

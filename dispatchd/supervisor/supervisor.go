@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"../config"
-	"./queue"
+	"dispatchd/config"
+	"dispatchd/supervisor/queue"
 
 	etcd "github.com/coreos/etcd/client"
 	"golang.org/x/net/context"

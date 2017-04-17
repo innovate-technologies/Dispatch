@@ -9,9 +9,10 @@ import (
 
 	"text/template"
 
-	"../../config"
-	"../../unit"
-	"../state"
+	"dispatchd/config"
+	"dispatchd/unit"
+	"dispatchd/unit/state"
+
 	etcd "github.com/coreos/etcd/client"
 	"golang.org/x/net/context"
 )
