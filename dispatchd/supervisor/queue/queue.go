@@ -21,7 +21,7 @@ var (
 	etcdAPI etcd.KeysAPI
 	// Config is a pointer need to be set to the main configuration
 	Config     *config.ConfigurationInfo
-	queueMutex *sync.Mutex
+	queueMutex = &sync.Mutex{}
 )
 
 // Run checks for waiting units and assigns them
