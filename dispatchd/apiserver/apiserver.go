@@ -3,11 +3,17 @@ package apiserver
 import (
 	"net/http"
 
+	"github.com/innovate-technologies/Dispatch/dispatchd/config"
 	"github.com/innovate-technologies/Dispatch/dispatchd/unit"
 	state "github.com/innovate-technologies/Dispatch/dispatchd/unit/state"
 
+	"strconv"
+
 	"gopkg.in/labstack/echo.v3"
 )
+
+// Config is a pointer need to be set to the main configuration
+var Config *config.ConfigurationInfo
 
 // Run starts the HTTP server
 func Run() {
@@ -18,7 +24,7 @@ func Run() {
 	e.PUT("/:zone/command", putCommand)
 	e.PUT("/:zone/unit", putUnit)
 	e.DELETE("/:zone/unit/:name", deleteUnit)
-	e.Logger.Fatal(e.Start(":1323"))
+	e.Logger.Fatal(e.Start(Config.BindIP + ":" + strconv.Itoa(Config.BindPort)))
 }
 
 func getRoot(c echo.Context) error {

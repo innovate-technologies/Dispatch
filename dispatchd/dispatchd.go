@@ -22,6 +22,7 @@ func main() {
 	machine.Config = &configuration
 	supervisor.Config = &configuration
 	command.Config = &configuration
+	apiserver.Config = &configuration
 
 	machine.RegisterMachine()
 	supervisor.Run()
