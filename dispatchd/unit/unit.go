@@ -198,6 +198,8 @@ func (unit *Unit) becomeDesiredState() {
 		unit.Start()
 	} else if unit.DesiredState == state.Dead {
 		unit.Stop()
+	} else if unit.DesiredState == state.Destroy {
+		unit.Destroy()
 	}
 }
 

@@ -12,18 +12,22 @@ const (
 	Dead
 	// Starting means the unit is becoming active
 	Starting
+	// Destroy means that the holder of the unit should delete the unit
+	Destroy
 )
 
 var nameStrings = [...]string{
 	"active",
 	"dead",
 	"starting",
+	"destroy"
 }
 
 var statePerInt = map[int]State{
 	0: Active,
 	1: Dead,
 	2: Starting,
+	3: Destroy
 }
 
 func (s State) String() string {
