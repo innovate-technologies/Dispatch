@@ -20,14 +20,14 @@ var nameStrings = [...]string{
 	"active",
 	"dead",
 	"starting",
-	"destroy"
+	"destroy",
 }
 
 var statePerInt = map[int]State{
 	0: Active,
 	1: Dead,
 	2: Starting,
-	3: Destroy
+	3: Destroy,
 }
 
 func (s State) String() string {
