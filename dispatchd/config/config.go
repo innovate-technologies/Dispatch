@@ -30,7 +30,7 @@ func newConfigurationInfo() ConfigurationInfo {
 	return config
 }
 
-// GetConfiguration reads the confiruration from config.json and returns it
+// GetConfiguration reads the configuration from config.json and returns it
 func GetConfiguration() ConfigurationInfo {
 	returnConfig := newConfigurationInfo()
 	data, err := os.Open("config.json")
