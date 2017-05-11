@@ -11,6 +11,8 @@ import (
 
 	"github.com/innovate-technologies/Dispatch/dispatchd/config"
 
+	"strconv"
+
 	etcd "github.com/coreos/etcd/client"
 	"golang.org/x/net/context"
 )
@@ -20,13 +22,21 @@ var (
 	etcdAPI etcd.KeysAPI
 	// Config is a pointer need to be set to the main configuration
 	Config    *config.ConfigurationInfo
-	etcdMutex sync.Mutex
+	etcdMutex = &sync.Mutex{}
 )
 
 // Run starts watching for commands to execute
 func Run() {
 	setUpEtcd()
 	go watchForNewCommands()
+}
+
+// SendCommand places a command to be ran on etcd
+func SendCommand(command string) string {
+	id := strconv.Itoa(time.Now().Nanosecond())
+	setUpEtcd()
+	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/commands/%s/%s/command", Config.Zone, id), command, &etcd.SetOptions{TTL: 24 * time.Hour})
+	return id
 }
 
 func watchForNewCommands() {
@@ -77,7 +87,7 @@ func readSdtToEtcd(key string, std *bufio.Reader) {
 		etcdMutex.Lock()
 		response, _ := etcdAPI.Get(ctx, outputPath, &etcd.GetOptions{})
 		output := response.Node.Value + string(line[:]) + "\n"
-		etcdAPI.Set(ctx, outputPath, output, &etcd.SetOptions{})
+		etcdAPI.Set(ctx, outputPath, output, &etcd.SetOptions{TTL: 24 * time.Hour})
 		etcdMutex.Unlock()
 	}
 }
