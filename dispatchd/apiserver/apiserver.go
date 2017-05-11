@@ -1,6 +1,7 @@
 package apiserver
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/innovate-technologies/Dispatch/dispatchd/config"
@@ -9,8 +10,13 @@ import (
 
 	"strconv"
 
+	"github.com/innovate-technologies/Dispatch/dispatchd/command"
 	"gopkg.in/labstack/echo.v3"
 )
+
+type commandInfo struct {
+	Command string `json:"command" form:"command" query:"command"`
+}
 
 // Config is a pointer need to be set to the main configuration
 var Config *config.ConfigurationInfo
@@ -21,8 +27,8 @@ func Run() {
 	e.GET("/", getRoot)
 	e.GET("/:zone/machines", getMachines)
 	e.GET("/:zone/units", getUnits)
-	e.PUT("/:zone/command", putCommand)
-	e.PUT("/:zone/unit", putUnit)
+	e.POST("/:zone/command", postCommand)
+	e.POST("/:zone/unit", postUnit)
 	e.DELETE("/:zone/unit/:name", deleteUnit)
 	e.Logger.Fatal(e.Start(Config.BindIP + ":" + strconv.Itoa(Config.BindPort)))
 }
@@ -43,16 +49,27 @@ func getUnits(c echo.Context) error {
 	return c.JSON(http.StatusOK, units)
 }
 
-func putCommand(c echo.Context) error {
-	return c.String(http.StatusTeapot, "Heh, sorry had no time... //TO DO")
+func postCommand(c echo.Context) error {
+	command.Config = Config
+	info := commandInfo{}
+	c.Bind(&info)
+	commandID := command.SendCommand(info.Command)
+	return c.JSON(http.StatusOK, map[string]string{"id": commandID})
 }
 
-func putUnit(c echo.Context) error {
+func postUnit(c echo.Context) error {
 	u := unit.New()
 	c.Bind(&u) // bind JSON to the unit
 	if u.Name == "" || u.UnitContent == "" {
+		fmt.Println(u)
 		return c.JSON(http.StatusBadRequest, map[string]string{"status": "error", "error": "missing parameters"})
 	}
+	// Check if exists
+	unitWithName := unit.NewFromEtcd(u.Name)
+	if unitWithName.Name != "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"status": "error", "error": "unit already exists"})
+	}
+
 	u.DesiredState = state.Active
 	u.SaveOnEtcd()
 	u.PutOnQueue()
@@ -68,6 +85,6 @@ func deleteUnit(c echo.Context) error {
 	if u.Name == "" {
 		return c.JSON(http.StatusBadRequest, map[string]string{"status": "error", "error": "unit does not exist"})
 	}
-	u.Destroy()
+	u.SetState(state.Destroy)
 	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }
