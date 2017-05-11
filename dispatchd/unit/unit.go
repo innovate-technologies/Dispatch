@@ -99,14 +99,14 @@ func NewFromEtcd(name string) Unit {
 
 // Start starts the specific unit
 func (unit *Unit) Start() {
-	unit.setState(state.Starting)
+	unit.SetState(state.Starting)
 	c := make(chan string)
 	dbusConnection.StartUnit(unit.Name, "fail", c)
 	result := <-c
 	if result == "done" {
-		unit.setState(state.Active)
+		unit.SetState(state.Active)
 	} else {
-		unit.setState(state.Dead)
+		unit.SetState(state.Dead)
 	}
 }
 
@@ -116,7 +116,7 @@ func (unit *Unit) Stop() {
 	dbusConnection.StopUnit(unit.Name, "fail", c)
 	result := <-c
 	if result == "done" {
-		unit.setState(state.Dead)
+		unit.SetState(state.Dead)
 	}
 }
 
@@ -227,7 +227,7 @@ func (unit *Unit) getKeyFromEtcd(key string) string {
 	return response.Node.Value
 }
 
-func (unit *Unit) setState(s state.State) {
+func (unit *Unit) SetState(s state.State) {
 	if unit.Global != "" {
 		return
 	}
