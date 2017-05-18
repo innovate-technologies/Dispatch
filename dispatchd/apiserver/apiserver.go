@@ -1,7 +1,6 @@
 package apiserver
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/innovate-technologies/Dispatch/dispatchd/config"
@@ -25,11 +24,11 @@ var Config *config.ConfigurationInfo
 func Run() {
 	e := echo.New()
 	e.GET("/", getRoot)
-	e.GET("/:zone/machines", getMachines)
-	e.GET("/:zone/units", getUnits)
-	e.POST("/:zone/command", postCommand)
-	e.POST("/:zone/unit", postUnit)
-	e.DELETE("/:zone/unit/:name", deleteUnit)
+	e.GET("/machines", getMachines)
+	e.GET("/units", getUnits)
+	e.POST("/command", postCommand)
+	e.POST("/unit", postUnit)
+	e.DELETE("/unit/:name", deleteUnit)
 	e.Logger.Fatal(e.Start(Config.BindIP + ":" + strconv.Itoa(Config.BindPort)))
 }
 
@@ -59,9 +58,10 @@ func postCommand(c echo.Context) error {
 
 func postUnit(c echo.Context) error {
 	u := unit.New()
+	u.DesiredState = state.Active
+
 	c.Bind(&u) // bind JSON to the unit
 	if u.Name == "" || u.UnitContent == "" {
-		fmt.Println(u)
 		return c.JSON(http.StatusBadRequest, map[string]string{"status": "error", "error": "missing parameters"})
 	}
 	// Check if exists
@@ -70,21 +70,20 @@ func postUnit(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"status": "error", "error": "unit already exists"})
 	}
 
-	u.DesiredState = state.Active
 	u.SaveOnEtcd()
 	u.PutOnQueue()
 	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func deleteUnit(c echo.Context) error {
-	name := c.FormValue("name")
+	name := c.Param("name")
 	if name == "" {
 		return c.JSON(http.StatusBadRequest, map[string]string{"status": "error", "error": "missing name"})
 	}
 	u := unit.NewFromEtcd(name)
-	if u.Name == "" {
+	if u.UnitContent == "" {
 		return c.JSON(http.StatusBadRequest, map[string]string{"status": "error", "error": "unit does not exist"})
 	}
-	u.SetState(state.Destroy)
+	u.SetDesiredState(state.Destroy)
 	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }
