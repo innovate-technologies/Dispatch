@@ -3,6 +3,7 @@ package unit
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"strings"
 	"time"
@@ -77,7 +78,7 @@ func NewFromEtcd(name string) Unit {
 	setUpEtcd()
 	unit := New()
 	unit.onEtcd = true
-	unit.Name = name
+	unit.Name = getKeyFromEtcd(name, "name")
 	unit.Machine = getKeyFromEtcd(name, "machine")
 	unit.Template = getKeyFromEtcd(name, "template")
 	unit.Global = getKeyFromEtcd(name, "global")
@@ -99,23 +100,39 @@ func NewFromEtcd(name string) Unit {
 
 // Start starts the specific unit
 func (unit *Unit) Start() {
+	log.Println("Starting unit", unit.Name)
 	unit.SetState(state.Starting)
 	c := make(chan string)
-	dbusConnection.StartUnit(unit.Name, "fail", c)
+	_, err := dbusConnection.StartUnit(unit.Name, "fail", c)
+	if err != nil {
+		log.Println("Error starting unit", unit.Name, err)
+		return
+	}
 	result := <-c
 	if result == "done" {
+		log.Println("Started unit", unit.Name)
 		unit.SetState(state.Active)
 	} else {
+		log.Println("Failed starting unit", unit.Name)
 		unit.SetState(state.Dead)
 	}
 }
 
 // Stop stops the unit
 func (unit *Unit) Stop() {
+	log.Println("Stopping unit", unit.Name)
 	c := make(chan string)
-	dbusConnection.StopUnit(unit.Name, "fail", c)
+	_, err := dbusConnection.StopUnit(unit.Name, "fail", c)
+	if err != nil {
+		log.Println("Error stopping unit", unit.Name, err)
+		log.Println("Killing unit", unit.Name)
+		dbusConnection.KillUnit(unit.Name, 9) // the big guns!
+		unit.SetState(state.Dead)
+		return
+	}
 	result := <-c
 	if result == "done" {
+		log.Println("Stopped unit", unit.Name)
 		unit.SetState(state.Dead)
 	}
 }
@@ -128,28 +145,42 @@ func (unit *Unit) Restart() {
 
 // Create writes the unit to the disk
 func (unit *Unit) Create() {
+	if unit.Name == "" {
+		log.Println("Error starting unit with no name")
+		return // can't create file without a name
+	}
 	thisUnitPath := unitPath + unit.Name
 
-	fileContent := []byte(unit.getKeyFromEtcd("unit"))
+	fileContent := []byte(getKeyFromEtcd(unit.Name, "unit"))
+
+	os.Remove(thisUnitPath) // make sure the old unit is gone
+
 	err := ioutil.WriteFile(thisUnitPath, fileContent, 0644)
 	if err != nil {
 		panic(err)
 	}
+
 	c := make(chan string)
-	dbusConnection.StopUnit(unit.Name, "fail", c) // stop unit to make sure new one is loaded
-	<-c
+	_, stopErr := dbusConnection.StopUnit(unit.Name, "fail", c) // stop unit to make sure new one is loaded
+	if stopErr == nil {
+		<-c // wait on completio,
+	}
+
 	unit.onDisk = true
-	dbusConnection.LinkUnitFiles([]string{thisUnitPath}, true, true)
+	_, dberr := dbusConnection.LinkUnitFiles([]string{thisUnitPath}, true, true)
+	fmt.Println(dberr)
 	dbusConnection.Reload()
 }
 
 // PutOnQueue places a specific unit on the queue
 func (unit *Unit) PutOnQueue() {
+	log.Println("Placing", unit.Name, "on queue")
 	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/queue/%s/%s/", Config.Zone, unit.Name), unit.Name, &etcd.SetOptions{})
 }
 
 // SaveOnEtcd saves the unit to etcd
 func (unit *Unit) SaveOnEtcd() {
+	log.Println("Saving", unit.Name, "to etcd")
 	setUpEtcd()
 
 	setKeyOnEtcd(unit.Name, "name", unit.Name)
@@ -173,11 +204,16 @@ func (unit *Unit) SaveOnEtcd() {
 
 // Destroy destroys the given unit
 func (unit *Unit) Destroy() {
+	log.Println("Destroying unit", unit.Name)
+
 	unit.Stop() // just making sure
+
 	os.Remove(unitPath + unit.Name)
 	unit.onDisk = false
 	dbusConnection.Reload()
+
 	etcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/units/%s/%s", Config.Zone, unit.Name), &etcd.DeleteOptions{Recursive: true})
+	etcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/machines/%s/%s/units/%s", Config.Zone, Config.MachineName, unit.Name), &etcd.DeleteOptions{Recursive: true})
 	if unit.Global != "" {
 		etcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/globals/%s/%s", Config.Zone, unit.Name), &etcd.DeleteOptions{})
 	}
@@ -193,7 +229,7 @@ func (unit *Unit) LoadAndWatch() {
 }
 
 func (unit *Unit) becomeDesiredState() {
-	fmt.Println("desiredstate:", unit.DesiredState)
+	fmt.Println("desiredState:", unit.DesiredState)
 	if unit.DesiredState == state.Active {
 		unit.Start()
 	} else if unit.DesiredState == state.Dead {
@@ -219,20 +255,19 @@ func (unit *Unit) Watch() {
 	}
 }
 
-func (unit *Unit) getKeyFromEtcd(key string) string {
-	response, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/units/%s/%s/%s", Config.Zone, unit.Name, key), &etcd.GetOptions{})
-	if err != nil {
-		return ""
-	}
-	return response.Node.Value
-}
-
+// SetState sets the state of the unit and updates etcd
 func (unit *Unit) SetState(s state.State) {
 	if unit.Global != "" {
 		return
 	}
 	unit.State = s
 	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/units/%s/%s/state", Config.Zone, unit.Name), s.String(), &etcd.SetOptions{})
+}
+
+// SetDesiredState sets the desiredstate of the unit and updates etcd
+func (unit *Unit) SetDesiredState(s state.State) {
+	unit.DesiredState = s
+	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/units/%s/%s/desiredState", Config.Zone, unit.Name), s.String(), &etcd.SetOptions{})
 }
 
 func setUpEtcd() {
@@ -259,5 +294,6 @@ func getKeyFromEtcd(unit, key string) string {
 }
 
 func setKeyOnEtcd(unit, key, content string) {
-	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/templates/%s/%s/%s", Config.Zone, unit, key), content, &etcd.SetOptions{})
+	_, err := etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/units/%s/%s/%s", Config.Zone, unit, key), content, &etcd.SetOptions{})
+	fmt.Println(err)
 }
