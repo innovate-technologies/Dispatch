@@ -53,7 +53,13 @@ func updateLoad() {
 		out, err := exec.Command("uptime").Output()
 		if err == nil {
 			uptimeString := fmt.Sprintf("%s", out)
-			load := strings.Split((strings.Split(uptimeString, "load average: ")[1]), ",")[0] //to do: divide #CPU
+			var textAfterLoadAverage string
+			if strings.Index(uptimeString, "load averages") >= 0 {
+				textAfterLoadAverage = strings.Split(uptimeString, "load averages: ")[1]
+			} else {
+				textAfterLoadAverage = strings.Split(uptimeString, "load average: ")[1]
+			}
+			load := strings.Split(textAfterLoadAverage, ",")[0] //to do: divide #CPU
 			etcdAPI.Set(ctx, machineLocation+"/load", load, &etcd.SetOptions{})
 		}
 		time.Sleep(1 * time.Second)
