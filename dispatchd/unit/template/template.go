@@ -19,11 +19,11 @@ import (
 
 // Template contains all info of a template
 type Template struct {
-	Name          string
-	Ports         []int64
-	Constraints   map[string]string
-	UnitContent   string
-	MaxPerMachine int64
+	Name          string            `json:"name"`
+	Ports         []int64           `json:"ports"`
+	Constraints   map[string]string `json:"constraints"`
+	UnitContent   string            `json:"unitContent"`
+	MaxPerMachine int64             `json:"maxPerMachine"`
 	onEtcd        bool
 }
 
