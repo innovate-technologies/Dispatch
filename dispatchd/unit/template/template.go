@@ -70,8 +70,8 @@ func NewFromEtcd(name string) Template {
 	return template
 }
 
-// SaveToEtcd saves the unit to etcd
-func (t *Template) SaveToEtcd() {
+// SaveOnEtcd saves the unit to etcd
+func (t *Template) SaveOnEtcd() {
 	setKeyOnEtcd(t.Name, "name", t.Name)
 	setKeyOnEtcd(t.Name, "unit", t.UnitContent)
 	setKeyOnEtcd(t.Name, "maxpermachine", strconv.FormatInt(t.MaxPerMachine, 10))
