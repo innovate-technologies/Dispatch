@@ -6,6 +6,7 @@ import (
 	"github.com/innovate-technologies/Dispatch/dispatchd/config"
 	"github.com/innovate-technologies/Dispatch/dispatchd/unit"
 	state "github.com/innovate-technologies/Dispatch/dispatchd/unit/state"
+	"github.com/innovate-technologies/Dispatch/dispatchd/unit/template"
 
 	"strconv"
 
@@ -29,6 +30,8 @@ func Run() {
 	e.POST("/command", postCommand)
 	e.POST("/unit", postUnit)
 	e.DELETE("/unit/:name", deleteUnit)
+	e.POST("/template", postTemplate)
+	e.DELETE("/template/:name", deleteTemplate)
 	e.Logger.Fatal(e.Start(Config.BindIP + ":" + strconv.Itoa(Config.BindPort)))
 }
 
@@ -85,5 +88,31 @@ func deleteUnit(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"status": "error", "error": "unit does not exist"})
 	}
 	u.SetDesiredState(state.Destroy)
+	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func postTemplate(c echo.Context) error {
+	t := template.New()
+
+	c.Bind(&t) // bind JSON to the unit
+	if t.Name == "" || t.UnitContent == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"status": "error", "error": "missing parameters"})
+	}
+	// Check if exists
+	templateWithName := template.NewFromEtcd(t.Name)
+	if templateWithName.Name != "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"status": "error", "error": "template already exists"})
+	}
+
+	t.SaveOnEtcd()
+	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func deleteTemplate(c echo.Context) error {
+	templateWithName := template.NewFromEtcd(c.Param("name"))
+	if templateWithName.Name == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"status": "error", "error": "template doesn't exist"})
+	}
+	templateWithName.Delete()
 	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }

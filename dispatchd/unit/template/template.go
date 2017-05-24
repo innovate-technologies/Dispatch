@@ -72,6 +72,7 @@ func NewFromEtcd(name string) Template {
 
 // SaveOnEtcd saves the unit to etcd
 func (t *Template) SaveOnEtcd() {
+	setUpEtcd()
 	setKeyOnEtcd(t.Name, "name", t.Name)
 	setKeyOnEtcd(t.Name, "unit", t.UnitContent)
 	setKeyOnEtcd(t.Name, "maxpermachine", strconv.FormatInt(t.MaxPerMachine, 10))
@@ -83,6 +84,12 @@ func (t *Template) SaveOnEtcd() {
 
 	setKeyOnEtcd(t.Name, "ports", strings.Join(portStrings, ","))
 	t.onEtcd = true
+}
+
+// Delete removes the template from etcd
+func (t *Template) Delete() {
+	setUpEtcd()
+	etcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/templates/%s/%s", Config.Zone, t.Name), &etcd.DeleteOptions{Recursive: true})
 }
 
 // NewUnit created a new unit from the template
@@ -127,6 +134,6 @@ func getKeyFromEtcd(unit, key string) string {
 	return response.Node.Value
 }
 
-func setKeyOnEtcd(unit, key, content string) {
-	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/templates/%s/%s/%s", Config.Zone, unit, key), content, &etcd.SetOptions{})
+func setKeyOnEtcd(templaye, key, content string) {
+	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/templates/%s/%s/%s", Config.Zone, templaye, key), content, &etcd.SetOptions{})
 }
