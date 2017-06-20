@@ -78,8 +78,8 @@ func (t *Template) SaveOnEtcd() {
 	setKeyOnEtcd(t.Name, "maxpermachine", strconv.FormatInt(t.MaxPerMachine, 10))
 
 	portStrings := []string{}
-	for port := range t.Ports {
-		portStrings = append(portStrings, strconv.Itoa(port))
+	for _, port := range t.Ports {
+		portStrings = append(portStrings, strconv.FormatInt(port, 10))
 	}
 
 	setKeyOnEtcd(t.Name, "ports", strings.Join(portStrings, ","))
@@ -95,12 +95,12 @@ func (t *Template) Delete() {
 // NewUnit created a new unit from the template
 func (t *Template) NewUnit(name string) {
 	u := unit.New()
-	u.Name = strings.Replace(t.Name, "*", name, 0)
+	u.Name = strings.Replace(t.Name, "*", name, -1)
 	u.Template = t.Name
 	u.DesiredState = state.Active
 	u.Ports = t.Ports
 
-	// pars unit content
+	// parse unit content
 	var unit bytes.Buffer
 	unitTemplate := template.New("unit template")
 	unitTemplate, _ = unitTemplate.Parse(t.UnitContent)
@@ -134,6 +134,7 @@ func getKeyFromEtcd(unit, key string) string {
 	return response.Node.Value
 }
 
-func setKeyOnEtcd(templaye, key, content string) {
-	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/templates/%s/%s/%s", Config.Zone, templaye, key), content, &etcd.SetOptions{})
+func setKeyOnEtcd(template, key, content string) {
+	fmt.Println(template, key, content)
+	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/templates/%s/%s/%s", Config.Zone, template, key), content, &etcd.SetOptions{})
 }
