@@ -4,6 +4,8 @@
 package dbusmock
 
 import (
+	"time"
+
 	dbus "github.com/coreos/go-systemd/dbus"
 	gomock "github.com/golang/mock/gomock"
 )
@@ -71,6 +73,7 @@ func (_m *MockDBusConnectionInterface) StartUnit(_param0 string, _param1 string,
 	ret := _m.ctrl.Call(_m, "StartUnit", _param0, _param1, _param2)
 	ret0, _ := ret[0].(int)
 	ret1, _ := ret[1].(error)
+	go sendDone(_param2)
 	return ret0, ret1
 }
 
@@ -84,10 +87,16 @@ func (_m *MockDBusConnectionInterface) StopUnit(_param0 string, _param1 string, 
 	ret := _m.ctrl.Call(_m, "StopUnit", _param0, _param1, _param2)
 	ret0, _ := ret[0].(int)
 	ret1, _ := ret[1].(error)
+	go sendDone(_param2)
 	return ret0, ret1
 }
 
 // StopUnit indicates an expected call of StopUnit
 func (_mr *MockDBusConnectionInterfaceMockRecorder) StopUnit(arg0, arg1, arg2 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "StopUnit", arg0, arg1, arg2)
+}
+
+func sendDone(c chan<- string) {
+	time.Sleep(1 * time.Second)
+	c <- "done"
 }
