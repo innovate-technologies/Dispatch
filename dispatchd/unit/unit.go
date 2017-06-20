@@ -2,13 +2,13 @@ package unit
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
-	"os"
 	"strings"
 	"time"
 
 	"strconv"
+
+	"github.com/spf13/afero"
 
 	"github.com/innovate-technologies/Dispatch/dispatchd/config"
 	"github.com/innovate-technologies/Dispatch/dispatchd/unit/state"
@@ -28,6 +28,8 @@ var (
 	EtcdAPI etcd.KeysAPI
 	// DBusConnection is the connection to the system's D-Bus
 	DBusConnection DBusConnectionInterface
+	// FS is the file system to be used
+	FS = afero.NewOsFs()
 )
 
 // UnitInterface is the interface to a Unit
@@ -168,11 +170,11 @@ func (unit *Unit) Create() {
 	}
 	thisUnitPath := unitPath + unit.Name
 
-	fileContent := []byte(getKeyFromEtcd(unit.Name, "unit"))
+	fileContent := []byte(unit.UnitContent)
 
-	os.Remove(thisUnitPath) // make sure the old unit is gone
-
-	err := ioutil.WriteFile(thisUnitPath, fileContent, 0644)
+	FS.Remove(thisUnitPath) // make sure the old unit is gone
+	file, err := FS.Create(thisUnitPath)
+	_, err = file.Write(fileContent)
 	if err != nil {
 		panic(err)
 	}
@@ -180,7 +182,7 @@ func (unit *Unit) Create() {
 	c := make(chan string)
 	_, stopErr := DBusConnection.StopUnit(unit.Name, "fail", c) // stop unit to make sure new one is loaded
 	if stopErr == nil {
-		<-c // wait on completio,
+		<-c // wait on completion
 	}
 
 	unit.onDisk = true
@@ -225,7 +227,7 @@ func (unit *Unit) Destroy() {
 
 	unit.Stop() // just making sure
 
-	os.Remove(unitPath + unit.Name)
+	FS.Remove(unitPath + unit.Name)
 	unit.onDisk = false
 	DBusConnection.Reload()
 
@@ -234,6 +236,7 @@ func (unit *Unit) Destroy() {
 	if unit.Global != "" {
 		EtcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/globals/%s/%s", Config.Zone, unit.Name), &etcd.DeleteOptions{})
 	}
+	unit.onEtcd = false
 }
 
 // LoadAndWatch loads the unit to the system and follows the desired state
