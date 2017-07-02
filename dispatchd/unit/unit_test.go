@@ -313,3 +313,40 @@ func Test_destroyGlobal(t *testing.T) {
 		t.Errorf("Unit is not unset as on etcd")
 	}
 }
+
+func Test_killAllOldUnitsWithNone(t *testing.T) {
+	setUpConfig()
+	mockDBus, ctrl := setUpMockDBus(t)
+	defer ctrl.Finish()
+	FS = afero.NewMemMapFs()
+
+	mockDBus.EXPECT().Reload()
+
+	KillAllOldUnits()
+
+	_, err := FS.Stat(unitPath)
+	if os.IsNotExist(err) {
+		t.Errorf("Unit directory does not exist.\n")
+	}
+}
+
+func Test_killAllOldUnits(t *testing.T) {
+	setUpConfig()
+	mockDBus, ctrl := setUpMockDBus(t)
+	defer ctrl.Finish()
+
+	FS = afero.NewMemMapFs()
+	FS.Create(unitPath + "test1.service")
+	FS.Create(unitPath + "test2.service")
+
+	mockDBus.EXPECT().KillUnit("test1.service", gomock.Any())
+	mockDBus.EXPECT().KillUnit("test2.service", gomock.Any())
+	mockDBus.EXPECT().Reload()
+
+	KillAllOldUnits()
+
+	_, err := FS.Stat(unitPath + "test1.service")
+	if !os.IsNotExist(err) {
+		t.Errorf("file still exists.\n")
+	}
+}

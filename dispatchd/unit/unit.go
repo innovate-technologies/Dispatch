@@ -82,13 +82,7 @@ func GetAll() ([]Unit, error) {
 
 // New returns a new Unit
 func New() Unit {
-	if DBusConnection == nil {
-		var err error
-		DBusConnection, err = dbus.NewSystemdConnection()
-		if err != nil {
-			panic(err)
-		}
-	}
+	setUpDBus()
 	return Unit{}
 }
 
@@ -172,8 +166,13 @@ func (unit *Unit) Create() {
 
 	fileContent := []byte(unit.UnitContent)
 
+	FS.MkdirAll(unitPath, 0755)
+
 	FS.Remove(thisUnitPath) // make sure the old unit is gone
 	file, err := FS.Create(thisUnitPath)
+	if err != nil {
+		panic(err)
+	}
 	_, err = file.Write(fileContent)
 	if err != nil {
 		panic(err)
@@ -315,4 +314,32 @@ func getKeyFromEtcd(unit, key string) string {
 
 func setKeyOnEtcd(unit, key, content string) {
 	EtcdAPI.Set(ctx, fmt.Sprintf("/dispatch/units/%s/%s/%s", Config.Zone, unit, key), content, &etcd.SetOptions{})
+}
+
+func setUpDBus() {
+	if DBusConnection == nil {
+		var err error
+		DBusConnection, err = dbus.NewSystemdConnection()
+		if err != nil {
+			panic(err)
+		}
+	}
+}
+
+// KillAllOldUnits makes sure all old Dispatch spawned unit files on the system are deleted
+func KillAllOldUnits() {
+	setUpDBus()
+
+	FS.MkdirAll(unitPath, 0755) // maybe we have a first run
+	files, err := afero.Afero{Fs: FS}.ReadDir(unitPath)
+	if err != nil {
+		panic(err)
+	}
+	for _, file := range files {
+		log.Println("Stopping unit", file.Name())
+		DBusConnection.KillUnit(file.Name(), 9) // do we care at this point?
+		FS.Remove(unitPath + file.Name())
+	}
+
+	DBusConnection.Reload()
 }

@@ -24,6 +24,7 @@ var (
 
 // RegisterMachine adds the machine to the cluster
 func RegisterMachine() {
+	unit.KillAllOldUnits() // Starting clean
 	setUpEtcd()
 
 	unit.Config = Config           // pass through the config
