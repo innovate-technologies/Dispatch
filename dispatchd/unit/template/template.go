@@ -72,7 +72,7 @@ func NewFromEtcd(name string) Template {
 	setUpEtcd()
 	template := New()
 	template.onEtcd = true
-	template.Name = name
+	template.Name = getKeyFromEtcd(name, "name")
 	template.UnitContent = getKeyFromEtcd(name, "unit")
 	template.MaxPerMachine, _ = strconv.ParseInt(getKeyFromEtcd(name, "maxpermachine"), 10, 64)
 

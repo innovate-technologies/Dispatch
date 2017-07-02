@@ -23,6 +23,9 @@ var Config *config.ConfigurationInfo
 
 // Run starts the HTTP server
 func Run() {
+	template.Config = Config
+	unit.Config = Config
+
 	e := echo.New()
 	e.GET("/", getRoot)
 	e.GET("/machines", getMachines)
