@@ -49,6 +49,24 @@ func newTemplateVariables(name string) templateVariables {
 	return out
 }
 
+// GetAll returns all templates in our zone
+func GetAll() ([]Template, error) {
+	setUpEtcd()
+	response, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/templates/%s", Config.Zone), &etcd.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	templates := []Template{}
+
+	for _, unitNode := range response.Node.Nodes {
+		pathParts := strings.Split(unitNode.Key, "/")
+		templates = append(templates, NewFromEtcd(pathParts[len(pathParts)-1]))
+	}
+
+	return templates, nil
+}
+
 // NewFromEtcd creates a new Template with info from etcd
 func NewFromEtcd(name string) Template {
 	setUpEtcd()

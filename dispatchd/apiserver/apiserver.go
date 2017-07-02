@@ -26,10 +26,15 @@ func Run() {
 	e := echo.New()
 	e.GET("/", getRoot)
 	e.GET("/machines", getMachines)
+
 	e.GET("/units", getUnits)
+
 	e.POST("/command", postCommand)
+
 	e.POST("/unit", postUnit)
 	e.DELETE("/unit/:name", deleteUnit)
+
+	e.GET("/templates", getTemplates)
 	e.POST("/template", postTemplate)
 	e.DELETE("/template/:name", deleteTemplate)
 
@@ -96,6 +101,14 @@ func deleteUnit(c echo.Context) error {
 	}
 	u.SetDesiredState(state.Destroy)
 	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func getTemplates(c echo.Context) error {
+	templates, err := template.GetAll()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"status": "error", "error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, templates)
 }
 
 func postTemplate(c echo.Context) error {
