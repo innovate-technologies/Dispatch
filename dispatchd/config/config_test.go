@@ -17,8 +17,7 @@ func Test_newConfigurationInfo(t *testing.T) {
 			name: "default values test",
 			want: ConfigurationInfo{
 				MachineName: hostname,
-				BindIP:      "127.0.0.1",
-				BindPort:    7384,
+				BindPath:    "/var/run/dispatch.socket",
 				EtcdAddress: "http://127.0.0.1:2379",
 				Zone:        "dc",
 				Arch:        runtime.GOARCH,
@@ -55,16 +54,9 @@ func Test_readEnv(t *testing.T) {
 		{
 			name:    "test bind ip",
 			args:    args{conf: &ConfigurationInfo{}},
-			envName: "DISPATCH_BINDIP",
-			envVal:  "127.0.1.1",
-			want:    &ConfigurationInfo{BindIP: "127.0.1.1"},
-		},
-		{
-			name:    "test bind port",
-			args:    args{conf: &ConfigurationInfo{}},
-			envName: "DISPATCH_BINDPORT",
-			envVal:  "1234",
-			want:    &ConfigurationInfo{BindPort: 1234},
+			envName: "DISPATCH_BINDPATH",
+			envVal:  "/tmp/test.sock",
+			want:    &ConfigurationInfo{BindPath: "/tmp/test.sock"},
 		},
 		{
 			name:    "test etcd arrd",

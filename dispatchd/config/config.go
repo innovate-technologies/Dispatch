@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"os"
 	"runtime"
-	"strconv"
 )
 
 // ConfigurationInfo contains the config file's content
@@ -12,8 +11,7 @@ type ConfigurationInfo struct {
 	MachineName string            `json:"machineName"`
 	Arch        string            `json:"arch"`
 	Tags        map[string]string `json:"tags"`
-	BindIP      string            `json:"bindIP"`
-	BindPort    int               `json:"bindPort"`
+	BindPath    string            `json:"bindPath"`
 	EtcdAddress string            `json:"etcdAddress"`
 	PublicIP    string            `json:"publicIP"`
 	Zone        string            `json:"zone"`
@@ -22,8 +20,7 @@ type ConfigurationInfo struct {
 func newConfigurationInfo() ConfigurationInfo {
 	config := ConfigurationInfo{}
 	config.MachineName, _ = os.Hostname()
-	config.BindIP = "127.0.0.1"
-	config.BindPort = 7384 // "IT" in ASCII to decimal
+	config.BindPath = "/var/run/dispatch.socket"
 	config.EtcdAddress = "http://127.0.0.1:2379"
 	config.Zone = "dc"
 	config.Arch = runtime.GOARCH
@@ -46,13 +43,8 @@ func readEnv(conf *ConfigurationInfo) {
 	if name := os.Getenv("DISPATCH_MACHINENAME"); name != "" {
 		conf.MachineName = name
 	}
-	if bindip := os.Getenv("DISPATCH_BINDIP"); bindip != "" {
-		conf.BindIP = bindip
-	}
-	if bindport := os.Getenv("DISPATCH_BINDPORT"); bindport != "" {
-		if port, err := strconv.Atoi(bindport); err == nil {
-			conf.BindPort = port
-		}
+	if bindpath := os.Getenv("DISPATCH_BINDPATH"); bindpath != "" {
+		conf.BindPath = bindpath
 	}
 	if etcdaddress := os.Getenv("DISPATCH_ETCDADDRESS"); etcdaddress != "" {
 		conf.EtcdAddress = etcdaddress

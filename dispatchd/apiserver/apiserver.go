@@ -1,14 +1,14 @@
 package apiserver
 
 import (
+	"net"
 	"net/http"
+	"os"
 
 	"github.com/innovate-technologies/Dispatch/dispatchd/config"
 	"github.com/innovate-technologies/Dispatch/dispatchd/unit"
 	state "github.com/innovate-technologies/Dispatch/dispatchd/unit/state"
 	"github.com/innovate-technologies/Dispatch/dispatchd/unit/template"
-
-	"strconv"
 
 	"github.com/innovate-technologies/Dispatch/dispatchd/command"
 	"gopkg.in/labstack/echo.v3"
@@ -32,7 +32,14 @@ func Run() {
 	e.DELETE("/unit/:name", deleteUnit)
 	e.POST("/template", postTemplate)
 	e.DELETE("/template/:name", deleteTemplate)
-	e.Logger.Fatal(e.Start(Config.BindIP + ":" + strconv.Itoa(Config.BindPort)))
+
+	os.Remove(Config.BindPath)
+	l, err := net.Listen("unix", Config.BindPath)
+	if err != nil {
+		e.Logger.Fatal(err)
+	}
+	e.Listener = l
+	e.Logger.Fatal(e.Start(""))
 }
 
 func getRoot(c echo.Context) error {
