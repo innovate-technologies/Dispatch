@@ -44,3 +44,8 @@ func ForString(name string) State {
 	fmt.Println(name)
 	return Dead // if no match has been found
 }
+
+// ForInt gives back the sate for the index
+func ForInt(i int) State {
+	return statePerInt[i]
+}

@@ -84,3 +84,42 @@ func TestForString(t *testing.T) {
 		})
 	}
 }
+
+func TestForInt(t *testing.T) {
+	type args struct {
+		i int
+	}
+	tests := []struct {
+		name string
+		args args
+		want State
+	}{
+		{
+			name: "active",
+			args: args{i: 0},
+			want: Active,
+		},
+		{
+			name: "dead",
+			args: args{i: 1},
+			want: Dead,
+		},
+		{
+			name: "starting",
+			args: args{i: 2},
+			want: Starting,
+		},
+		{
+			name: "destroy",
+			args: args{i: 3},
+			want: Destroy,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ForInt(tt.args.i); got != tt.want {
+				t.Errorf("ForInt() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
