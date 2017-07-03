@@ -27,10 +27,6 @@ type Template struct {
 	onEtcd        bool
 }
 
-type templateVariables struct { // TO DO: add more
-	Name string
-}
-
 var (
 	// Config is a pointer need to be set to the main configuration
 	Config  *config.ConfigurationInfo
@@ -41,12 +37,6 @@ var (
 // New returns a new blank Template
 func New() Template {
 	return Template{}
-}
-
-func newTemplateVariables(name string) templateVariables {
-	out := templateVariables{}
-	out.Name = name
-	return out
 }
 
 // GetAll returns all templates in our zone
@@ -111,7 +101,7 @@ func (t *Template) Delete() {
 }
 
 // NewUnit created a new unit from the template
-func (t *Template) NewUnit(name string) {
+func (t *Template) NewUnit(name string, vars map[string]string) {
 	u := unit.New()
 	u.Name = strings.Replace(t.Name, "*", name, -1)
 	u.Template = t.Name
@@ -122,7 +112,8 @@ func (t *Template) NewUnit(name string) {
 	var unit bytes.Buffer
 	unitTemplate := template.New("unit template")
 	unitTemplate, _ = unitTemplate.Parse(t.UnitContent)
-	unitTemplate.Execute(&unit, newTemplateVariables(name))
+	vars["name"] = name
+	unitTemplate.Execute(&unit, vars)
 	u.UnitContent = unit.String()
 
 	u.SaveOnEtcd()

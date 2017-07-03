@@ -19,6 +19,11 @@ type commandInfo struct {
 	Command string `json:"command" form:"command" query:"command"`
 }
 
+type templateUnitOptions struct {
+	Name string            `json:"name" form:"name" query:"name"`
+	Vars map[string]string `json:"vars" form:"vars" query:"vars"`
+}
+
 // Config is a pointer need to be set to the main configuration
 var Config *config.ConfigurationInfo
 
@@ -31,11 +36,11 @@ func Run() {
 	e.GET("/", getRoot)
 	e.GET("/machines", getMachines)
 
-	e.GET("/units", getUnits)
-
 	e.POST("/command", postCommand)
 
+	e.GET("/units", getUnits)
 	e.POST("/unit", postUnit)
+	e.POST("/unit/from-template/:template", postUnitFromTemplate)
 	e.DELETE("/unit/:name", deleteUnit)
 
 	e.GET("/templates", getTemplates)
@@ -91,6 +96,28 @@ func postUnit(c echo.Context) error {
 
 	u.SaveOnEtcd()
 	u.PutOnQueue()
+	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func postUnitFromTemplate(c echo.Context) error {
+	if c.Param("template") == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"status": "error", "error": "missing template name"})
+	}
+
+	info := templateUnitOptions{}
+	c.Bind(&info)
+
+	if info.Name == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"status": "error", "error": "missing unit name"})
+	}
+
+	t := template.NewFromEtcd(c.Param("template"))
+
+	if t.Name == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"status": "error", "error": "template doesn't exist"})
+	}
+
+	t.NewUnit(info.Name, info.Vars)
 	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }
 
