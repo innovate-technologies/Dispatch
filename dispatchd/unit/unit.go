@@ -88,6 +88,10 @@ func New() Unit {
 
 // NewFromEtcd creates a new unit with info from etcd
 func NewFromEtcd(name string) Unit {
+	if !strings.HasSuffix(name, ".service") {
+		name += ".service"
+	}
+
 	setUpEtcd()
 	unit := New()
 	unit.onEtcd = true
@@ -196,8 +200,16 @@ func (unit *Unit) PutOnQueue() {
 	EtcdAPI.Set(ctx, fmt.Sprintf("/dispatch/queue/%s/%s", Config.Zone, unit.Name), unit.Name, &etcd.SetOptions{})
 }
 
+func (unit *Unit) normalizeName() {
+	if !strings.HasSuffix(unit.Name, ".service") {
+		unit.Name += ".service"
+	}
+}
+
 // SaveOnEtcd saves the unit to etcd
 func (unit *Unit) SaveOnEtcd() {
+	unit.normalizeName()
+
 	log.Println("Saving", unit.Name, "to etcd")
 	setUpEtcd()
 

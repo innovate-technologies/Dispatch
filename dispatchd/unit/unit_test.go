@@ -39,7 +39,7 @@ func setUpConfig() {
 
 func getTestUnit() Unit {
 	return Unit{
-		Name:         "test-unit",
+		Name:         "test-unit.service",
 		Machine:      "test-machine",
 		Template:     "",
 		Global:       "",
@@ -76,7 +76,7 @@ func Test_newFromEtcd(t *testing.T) {
 	mockEtcd, ctrl := setUpMockEtcd(t)
 	defer ctrl.Finish()
 
-	unitName := "test-unit"
+	unitName := "test-unit.service"
 
 	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/%s", Config.Zone, unitName, "name"), gomock.Any()).Return(&etcd.Response{Node: &etcd.Node{Value: unitName}}, nil)
 	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/%s", Config.Zone, unitName, "machine"), gomock.Any()).Return(&etcd.Response{Node: &etcd.Node{Value: "test-machine"}}, nil)
@@ -98,7 +98,7 @@ func Test_newFromEtcd(t *testing.T) {
 		onEtcd:       true,
 	}
 
-	if got := NewFromEtcd(unitName); !reflect.DeepEqual(got, want) {
+	if got := NewFromEtcd("test-unit"); !reflect.DeepEqual(got, want) {
 		t.Errorf("Got %v, want %v", got, want)
 	}
 }
