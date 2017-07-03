@@ -38,6 +38,7 @@ func AddUnit(name string) {
 		setUpEtcd()
 	}
 	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/queue/%s/%s", Config.Zone, name), name, &etcd.SetOptions{})
+	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/units/%s/%s/machine", Config.Zone, name), "", &etcd.SetOptions{})
 }
 
 func checkQueue() {
@@ -172,6 +173,7 @@ func getUnit(name string, out chan unit.Unit) {
 
 func assignUnitToMachine(unit, machine string) {
 	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/machines/%s/%s/units/%s", Config.Zone, machine, unit), unit, &etcd.SetOptions{})
+	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/units/%s/%s/machine", Config.Zone, unit), machine, &etcd.SetOptions{})
 	etcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/queue/%s/%s", Config.Zone, unit), &etcd.DeleteOptions{})
 }
 
