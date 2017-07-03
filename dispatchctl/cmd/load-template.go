@@ -15,7 +15,7 @@ var loadTemplateCmd = &cobra.Command{
 	Run:   loadTemplate,
 }
 
-// TemplatepParams contains all the parameters needed to create a template
+// TemplateParams contains all the parameters needed to create a template
 type TemplateParams struct {
 	Name          string            `json:"name"`
 	Ports         []int64           `json:"ports"`
