@@ -4,6 +4,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/innovate-technologies/Dispatch/dispatchd/config"
 	"github.com/innovate-technologies/Dispatch/dispatchd/unit"
@@ -118,6 +119,11 @@ func postTemplate(c echo.Context) error {
 	t := template.New()
 
 	c.Bind(&t) // bind JSON to the unit
+
+	if !strings.Contains(t.Name, "*") {
+		return c.JSON(http.StatusBadRequest, map[string]string{"status": "error", "error": "Name needs to contain a wildcard (*)"})
+	}
+
 	if t.Name == "" || t.UnitContent == "" {
 		return c.JSON(http.StatusBadRequest, map[string]string{"status": "error", "error": "missing parameters"})
 	}
