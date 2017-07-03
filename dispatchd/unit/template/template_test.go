@@ -97,7 +97,7 @@ func Test_newUnit(t *testing.T) {
 
 	template := getTestTemplate()
 
-	unitName := "test-temp-test"
+	unitName := "test-temp-test.service"
 
 	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/%s", Config.Zone, unitName, "name"), unitName, gomock.Any())
 	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/%s", Config.Zone, unitName, "unit"), template.UnitContent, gomock.Any()) // TO DO: add vars
