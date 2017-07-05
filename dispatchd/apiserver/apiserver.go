@@ -39,11 +39,13 @@ func Run() {
 	e.POST("/command", postCommand)
 
 	e.GET("/units", getUnits)
+	e.GET("/unit/:name", getUnit)
 	e.POST("/unit", postUnit)
 	e.POST("/unit/from-template/:template", postUnitFromTemplate)
 	e.DELETE("/unit/:name", deleteUnit)
 
 	e.GET("/templates", getTemplates)
+	e.GET("/template/:name", getTemplate)
 	e.POST("/template", postTemplate)
 	e.DELETE("/template/:name", deleteTemplate)
 
@@ -70,6 +72,14 @@ func getUnits(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"status": "error", "error": err.Error()})
 	}
 	return c.JSON(http.StatusOK, units)
+}
+
+func getUnit(c echo.Context) error {
+	unit := unit.NewFromEtcd(c.Param("name"))
+	if unit.Name == "" {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"status": "error", "error": "Unit does not exist"})
+	}
+	return c.JSON(http.StatusOK, unit)
 }
 
 func postCommand(c echo.Context) error {
@@ -135,6 +145,14 @@ func deleteUnit(c echo.Context) error {
 }
 
 func getTemplates(c echo.Context) error {
+	template := template.NewFromEtcd(c.Param("name"))
+	if template.Name == "" {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"status": "error", "error": "Template not found"})
+	}
+	return c.JSON(http.StatusOK, template)
+}
+
+func getTemplate(c echo.Context) error {
 	templates, err := template.GetAll()
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"status": "error", "error": err.Error()})
