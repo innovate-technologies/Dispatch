@@ -211,6 +211,14 @@ func Test_putOnQueue(t *testing.T) {
 	unit.PutOnQueue()
 }
 
+func Test_putOnQueueGlobal(t *testing.T) {
+	setUpConfig()
+	unit := getTestUnit()
+	unit.Global = unit.Name
+
+	unit.PutOnQueue()
+}
+
 func Test_saveOnEtcd(t *testing.T) {
 	setUpConfig()
 	mockEtcd, ctrl := setUpMockEtcd(t)

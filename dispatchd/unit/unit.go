@@ -197,6 +197,9 @@ func (unit *Unit) Create() {
 // PutOnQueue places a specific unit on the queue
 func (unit *Unit) PutOnQueue() {
 	log.Println("Placing", unit.Name, "on queue")
+	if unit.Global != "" {
+		return
+	}
 	EtcdAPI.Set(ctx, fmt.Sprintf("/dispatch/queue/%s/%s", Config.Zone, unit.Name), unit.Name, &etcd.SetOptions{})
 }
 
