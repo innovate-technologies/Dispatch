@@ -16,6 +16,7 @@ type UnitParams struct {
 	Ports        []int64 `json:"ports"`
 	Constraints  map[string]string
 	UnitContent  string `json:"unitContent"`
+	Global       string `json:"global"`
 }
 
 // loadunitCmd represents the load-unit command
@@ -25,6 +26,8 @@ var loadunitCmd = &cobra.Command{
 	Long:  `Loads a unit file onto the dispatch cluster`,
 	Run:   runLoadUnit,
 }
+
+var isGlobal *bool
 
 func init() {
 	RootCmd.AddCommand(loadunitCmd)
@@ -37,7 +40,7 @@ func init() {
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	// load-unitCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	isGlobal = loadunitCmd.Flags().BoolP("global", "g", false, "Sets the unit as a global")
 
 }
 
@@ -57,7 +60,9 @@ func runLoadUnit(cmd *cobra.Command, args []string) {
 	params := UnitParams{}
 	params.Name = pathParts[len(pathParts)-1]
 	params.UnitContent = string(fileBytes)
-
+	if *isGlobal {
+		params.Global = params.Name
+	}
 	response := StandardResponse{}
 
 	_, postErr := r.R().SetHeader("Content-Type", "application/json").SetBody(params).SetResult(&response).Post("/unit")
