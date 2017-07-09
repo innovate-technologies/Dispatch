@@ -99,9 +99,9 @@ func NewFromEtcd(name string) Unit {
 	unit.Machine = getKeyFromEtcd(name, "machine")
 	unit.Template = getKeyFromEtcd(name, "template")
 	unit.Global = getKeyFromEtcd(name, "global")
-	unit.State = state.Dead
 	unit.UnitContent = getKeyFromEtcd(name, "unit")
 	unit.DesiredState = state.ForString(getKeyFromEtcd(name, "desiredState"))
+	unit.State = state.ForString(getKeyFromEtcd(name, "state"))
 
 	unit.Ports = []int64{}
 	portsStringArray := strings.Split(getKeyFromEtcd(name, "ports"), ",")

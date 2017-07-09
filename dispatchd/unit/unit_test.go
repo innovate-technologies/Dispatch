@@ -85,13 +85,14 @@ func Test_newFromEtcd(t *testing.T) {
 	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/%s", Config.Zone, unitName, "desiredState"), gomock.Any()).Return(&etcd.Response{Node: &etcd.Node{Value: "active"}}, nil)
 	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/%s", Config.Zone, unitName, "template"), gomock.Any()).Return(&etcd.Response{Node: &etcd.Node{Value: ""}}, nil)
 	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/%s", Config.Zone, unitName, "ports"), gomock.Any()).Return(&etcd.Response{Node: &etcd.Node{Value: "80,443"}}, nil)
+	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/%s", Config.Zone, unitName, "state"), gomock.Any()).Return(&etcd.Response{Node: &etcd.Node{Value: "active"}}, nil)
 
 	want := Unit{
 		Name:         unitName,
 		Machine:      "test-machine",
 		Global:       "",
 		UnitContent:  "test content",
-		State:        state.Dead,
+		State:        state.Active,
 		DesiredState: state.Active,
 		Template:     "",
 		Ports:        []int64{80, 443},
