@@ -127,6 +127,10 @@ func postUnitFromTemplate(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"status": "error", "error": "template doesn't exist"})
 	}
 
+	if info.Vars == nil {
+		info.Vars = map[string]string{}
+	}
+
 	t.NewUnit(info.Name, info.Vars)
 	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }
