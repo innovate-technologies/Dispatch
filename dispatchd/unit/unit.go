@@ -60,6 +60,7 @@ type Unit struct {
 	UnitContent  string `json:"unitContent"`
 	onEtcd       bool
 	onDisk       bool
+	etcdName     string
 }
 
 // GetAll returns all units in our zone
@@ -94,6 +95,7 @@ func NewFromEtcd(name string) Unit {
 
 	setUpEtcd()
 	unit := New()
+	unit.etcdName = name
 	unit.onEtcd = true
 	unit.Name = getKeyFromEtcd(name, "name")
 	unit.Machine = getKeyFromEtcd(name, "machine")
@@ -164,6 +166,11 @@ func (unit *Unit) Restart() {
 func (unit *Unit) Create() {
 	if unit.Name == "" {
 		log.Println("Error starting unit with no name")
+		if unit.etcdName != "" {
+			// Faulty unit
+			unit.Name = unit.etcdName
+			unit.Destroy()
+		}
 		return // can't create file without a name
 	}
 	thisUnitPath := unitPath + unit.Name
