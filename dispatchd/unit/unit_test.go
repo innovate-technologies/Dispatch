@@ -97,6 +97,7 @@ func Test_newFromEtcd(t *testing.T) {
 		Template:     "",
 		Ports:        []int64{80, 443},
 		onEtcd:       true,
+		etcdName:     unitName,
 	}
 
 	if got := NewFromEtcd("test-unit"); !reflect.DeepEqual(got, want) {
