@@ -7,8 +7,10 @@ install:
 - go test ./...
 - cd dispatchd && go build -v ./ && mv dispatchd dispatchd-linux-amd64 && cd ..
 - cd dispatchd && GOARCH=arm go build -v ./ && mv dispatchd dispatchd-linux-arm && cd ..
+- cd dispatchd && GOARCH=arm64 go build -v ./ && mv dispatchd dispatchd-linux-arm64 && cd ..
 - cd dispatchctl && go build -v ./ && mv dispatchctl dispatchctl-linux-amd64 && cd ..
 - cd dispatchctl && GOARCH=arm go build -v ./ && mv dispatchctl dispatchctl-linux-arm && cd ..
+- cd dispatchctl && GOARCH=arm64 go build -v ./ && mv dispatchctl dispatchctl-linux-arm64 && cd ..
 deploy:
   skip_cleanup: true
   provider: releases
@@ -17,8 +19,10 @@ deploy:
   file: 
     - dispatchd/dispatchd-linux-amd64
     - dispatchd/dispatchd-linux-arm 
+    - dispatchd/dispatchd-linux-arm64
     - dispatchctl/dispatchctl-linux-amd64
-    - dispatchctl/dispatchctl-linux-arm 
+    - dispatchctl/dispatchctl-linux-arm
+    - dispatchctl/dispatchctl-linux-arm64
   overwrite: true
   on:
     repo: innovate-technologies/Dispatch
