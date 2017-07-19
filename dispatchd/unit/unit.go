@@ -293,6 +293,9 @@ func (unit *Unit) Watch() {
 			unit.DesiredState = state.ForString(r.Node.Value)
 			unit.becomeDesiredState()
 		}
+		if r.Action == "delete" {
+			break
+		}
 	}
 }
 
