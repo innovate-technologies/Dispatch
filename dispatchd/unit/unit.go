@@ -299,6 +299,21 @@ func (unit *Unit) Watch() {
 	}
 }
 
+// WaitOnDestroy waits for the unit to enter a destroyed state
+func (unit *Unit) WaitOnDestroy() {
+	_, err := EtcdAPI.Get(ctx, fmt.Sprintf("/dispatch/units/%s/%s", Config.Zone, unit.Name), &etcd.GetOptions{Recursive: true})
+	if err != nil { // Destroyed already
+		return
+	}
+	w := EtcdAPI.Watcher(fmt.Sprintf("/dispatch/units/%s/%s/name", Config.Zone, unit.Name), &etcd.WatcherOptions{})
+	for {
+		r, err := w.Next(ctx)
+		if err != nil || r.Action == "delete" {
+			break
+		}
+	}
+}
+
 // SetState sets the state of the unit and updates etcd
 func (unit *Unit) SetState(s state.State) {
 	if unit.Global != "" {

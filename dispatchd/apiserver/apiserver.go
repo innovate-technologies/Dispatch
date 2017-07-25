@@ -145,6 +145,7 @@ func deleteUnit(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"status": "error", "error": "unit does not exist"})
 	}
 	u.SetDesiredState(state.Destroy)
+	u.WaitOnDestroy()
 	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }
 
