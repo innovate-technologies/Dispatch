@@ -40,6 +40,7 @@ func RegisterMachine() {
 	go renewAlive()
 	go updateLoad()
 	go startUnits()
+	go checkUnits()
 }
 
 func renewAlive() {
@@ -88,7 +89,7 @@ func startUnits() {
 	if err == nil {
 		for _, node := range result.Node.Nodes {
 			u := unit.NewFromEtcd(node.Value)
-			u.LoadAndWatch()
+			go u.LoadAndWatch()
 			units[node.Value] = u
 		}
 	}
@@ -105,13 +106,29 @@ func watchUnits() {
 		}
 		if r.Action == "set" {
 			u := unit.NewFromEtcd(r.Node.Value)
-			u.LoadAndWatch()
+			go u.LoadAndWatch()
 			units[r.Node.Value] = u
 		}
 		if r.Action == "delete" {
 			if unit, exists := units[r.PrevNode.Value]; exists {
 				unit.Destroy()
 				delete(units, r.PrevNode.Value)
+			}
+		}
+	}
+}
+
+func checkUnits() {
+	for {
+		time.Sleep(10 * time.Second)
+		result, err := etcdAPI.Get(ctx, machineLocation+"/units", &etcd.GetOptions{Recursive: true})
+		if err == nil {
+			for _, node := range result.Node.Nodes {
+				if _, ok := units[node.Value]; !ok {
+					u := unit.NewFromEtcd(node.Value)
+					go u.LoadAndWatch()
+					units[node.Value] = u
+				}
 			}
 		}
 	}
