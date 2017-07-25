@@ -253,6 +253,7 @@ func (unit *Unit) Destroy() {
 	DBusConnection.Reload()
 
 	EtcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/units/%s/%s", Config.Zone, unit.Name), &etcd.DeleteOptions{Recursive: true})
+	EtcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/queue/%s/%s", Config.Zone, unit.Name), &etcd.DeleteOptions{Recursive: true})
 	EtcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/machines/%s/%s/units/%s", Config.Zone, Config.MachineName, unit.Name), &etcd.DeleteOptions{Recursive: true})
 	if unit.Global != "" {
 		EtcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/globals/%s/%s", Config.Zone, unit.Name), &etcd.DeleteOptions{})
