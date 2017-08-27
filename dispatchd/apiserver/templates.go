@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/innovate-technologies/Dispatch/dispatchd/unit/template"
-	"github.com/labstack/echo"
+	"gopkg.in/labstack/echo.v3"
 )
 
 func getTemplates(c echo.Context) error {

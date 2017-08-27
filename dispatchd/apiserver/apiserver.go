@@ -41,6 +41,8 @@ func Run() {
 	e.POST("/unit", postUnit)
 	e.POST("/unit/from-template/:template", postUnitFromTemplate)
 	e.DELETE("/unit/:name", deleteUnit)
+	e.PUT("/unit/:name/start", startUnit)
+	e.PUT("/unit/:name/stop", stopUnit)
 
 	e.GET("/templates", getTemplates)
 	e.GET("/template/:name", getTemplate)

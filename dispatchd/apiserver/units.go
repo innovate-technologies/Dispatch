@@ -5,7 +5,7 @@ import (
 
 	"github.com/innovate-technologies/Dispatch/dispatchd/unit"
 	state "github.com/innovate-technologies/Dispatch/dispatchd/unit/state"
-	"github.com/labstack/echo"
+	"gopkg.in/labstack/echo.v3"
 )
 
 func getUnits(c echo.Context) error {
@@ -60,5 +60,37 @@ func deleteUnit(c echo.Context) error {
 	}
 
 	u.WaitOnDestroy()
+	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func stopUnit(c echo.Context) error {
+	name := c.Param("name")
+	if name == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"status": "error", "error": "missing name"})
+	}
+	u := unit.NewFromEtcd(name)
+	if u.UnitContent == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"status": "error", "error": "unit does not exist"})
+	}
+
+	u.SetDesiredState(state.Dead)
+	u.WaitOnState(state.Dead)
+
+	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func startUnit(c echo.Context) error {
+	name := c.Param("name")
+	if name == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"status": "error", "error": "missing name"})
+	}
+	u := unit.NewFromEtcd(name)
+	if u.UnitContent == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"status": "error", "error": "unit does not exist"})
+	}
+
+	u.SetDesiredState(state.Active)
+	u.WaitOnState(state.Active)
+
 	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }
