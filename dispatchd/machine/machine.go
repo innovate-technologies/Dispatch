@@ -30,7 +30,7 @@ func RegisterMachine() {
 	unit.Config = Config           // pass through the config
 	units = map[string]unit.Unit{} // initialize map
 
-	machineLocation = fmt.Sprintf("/dispatch/machines/%s/%s", Config.Zone, Config.MachineName)
+	machineLocation = fmt.Sprintf("/dispatch/%s/machines/%s", Config.Zone, Config.MachineName)
 
 	etcdAPI.Set(ctx, machineLocation+"/arch", Config.Arch, &etcd.SetOptions{})
 	etcdAPI.Set(ctx, machineLocation+"/ip", Config.PublicIP, &etcd.SetOptions{})
@@ -85,7 +85,7 @@ func setTags(tags map[string]string) {
 }
 
 func startUnits() {
-	result, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/machines/%s/%s/units", Config.Zone, Config.MachineName), &etcd.GetOptions{Recursive: true})
+	result, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/machines/%s/units", Config.Zone, Config.MachineName), &etcd.GetOptions{Recursive: true})
 	if err == nil {
 		for _, node := range result.Node.Nodes {
 			u := unit.NewFromEtcd(node.Value)

@@ -29,7 +29,7 @@ func Run() {
 }
 
 func checkSupervisorAlive() {
-	_, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/supervisor/%s/alive", Config.Zone), &etcd.GetOptions{})
+	_, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/supervisor/alive", Config.Zone), &etcd.GetOptions{})
 	if err != nil {
 		election()
 	}
@@ -46,7 +46,7 @@ func election() {
 
 func voteForSupervisor() string {
 	fmt.Println("Voting for new supervisor")
-	res, err := etcdAPI.CreateInOrder(ctx, fmt.Sprintf("/dispatch/vote/%s/", Config.Zone), Config.MachineName, &etcd.CreateInOrderOptions{TTL: 10 * time.Second})
+	res, err := etcdAPI.CreateInOrder(ctx, fmt.Sprintf("/dispatch/%s/vote/", Config.Zone), Config.MachineName, &etcd.CreateInOrderOptions{TTL: 10 * time.Second})
 	if err != nil {
 		panic(err)
 	}
@@ -55,7 +55,7 @@ func voteForSupervisor() string {
 }
 
 func getWinningVote() string {
-	res, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/vote/%s/", Config.Zone), &etcd.GetOptions{Recursive: true, Sort: true})
+	res, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/vote/", Config.Zone), &etcd.GetOptions{Recursive: true, Sort: true})
 	if err != nil {
 		panic(err)
 	}
@@ -64,8 +64,8 @@ func getWinningVote() string {
 
 func becomeSupervisor() {
 	IsSupervisor = true
-	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/supervisor/%s/alive", Config.Zone), "1", &etcd.SetOptions{TTL: 10 * time.Second})
-	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/supervisor/%s/machine", Config.Zone), Config.MachineName, &etcd.SetOptions{})
+	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/%s/supervisor/alive", Config.Zone), "1", &etcd.SetOptions{TTL: 10 * time.Second})
+	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/%s/supervisor/machine", Config.Zone), Config.MachineName, &etcd.SetOptions{})
 	go letPeasantsKnow()
 	go watchMachines()
 	go watchGlobals()
@@ -76,7 +76,7 @@ func becomeSupervisor() {
 // letPeasantsKnow makes sure everybody knows you're not dead
 func letPeasantsKnow() {
 	for {
-		etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/supervisor/%s/alive", Config.Zone), "", &etcd.SetOptions{TTL: 10 * time.Second, Refresh: true})
+		etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/%s/supervisor/alive", Config.Zone), "", &etcd.SetOptions{TTL: 10 * time.Second, Refresh: true})
 		time.Sleep(1 * time.Second)
 	}
 }
@@ -85,7 +85,7 @@ func watchToBecomeSupervisor() {
 	if IsSupervisor {
 		return // why would you watch yourself?
 	}
-	w := etcdAPI.Watcher(fmt.Sprintf("/dispatch/supervisor/%s/alive", Config.Zone), &etcd.WatcherOptions{})
+	w := etcdAPI.Watcher(fmt.Sprintf("/dispatch/%s/supervisor/alive", Config.Zone), &etcd.WatcherOptions{})
 	for {
 		r, err := w.Next(ctx)
 		if err != nil {
@@ -100,7 +100,7 @@ func watchToBecomeSupervisor() {
 
 func watchMachines() {
 	go checkForDeadMachines() // clean out the dead on arrival ones
-	w := etcdAPI.Watcher(fmt.Sprintf("/dispatch/machines/%s/", Config.Zone), &etcd.WatcherOptions{Recursive: true})
+	w := etcdAPI.Watcher(fmt.Sprintf("/dispatch/%s/machines/", Config.Zone), &etcd.WatcherOptions{Recursive: true})
 	for {
 		r, err := w.Next(ctx)
 		if err != nil {
@@ -126,7 +126,7 @@ func watchMachines() {
 }
 
 func checkForDeadMachines() {
-	response, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/machines/%s/", Config.Zone), &etcd.GetOptions{})
+	response, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/machines/", Config.Zone), &etcd.GetOptions{})
 	if err != nil {
 		return //not important for now
 	}
@@ -151,7 +151,7 @@ func foundDeadMachine(key string) {
 
 func foundNewMachine(key string) {
 	// set globals
-	result, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/globals/%s/", Config.Zone), &etcd.GetOptions{Recursive: true})
+	result, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/globals/", Config.Zone), &etcd.GetOptions{Recursive: true})
 	if err == nil {
 		for _, node := range result.Node.Nodes {
 			go etcdAPI.Set(ctx, key+"/units/"+node.Value, node.Value, &etcd.SetOptions{})

@@ -37,8 +37,8 @@ func AddUnit(name string) {
 	if etcdAPI == nil {
 		setUpEtcd()
 	}
-	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/queue/%s/%s", Config.Zone, name), name, &etcd.SetOptions{})
-	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/units/%s/%s/machine", Config.Zone, name), "", &etcd.SetOptions{})
+	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/%s/queue/%s", Config.Zone, name), name, &etcd.SetOptions{})
+	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/%s/units/%s/machine", Config.Zone, name), "", &etcd.SetOptions{})
 }
 
 func checkQueue() {
@@ -50,7 +50,7 @@ func checkQueue() {
 
 func importExisting() {
 	queueMutex.Lock()
-	response, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/queue/%s/", Config.Zone), &etcd.GetOptions{})
+	response, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/queue/", Config.Zone), &etcd.GetOptions{})
 	if err != nil {
 		return
 	}
@@ -61,7 +61,7 @@ func importExisting() {
 }
 
 func watchQueue() {
-	w := etcdAPI.Watcher(fmt.Sprintf("/dispatch/queue/%s/", Config.Zone), &etcd.WatcherOptions{Recursive: true})
+	w := etcdAPI.Watcher(fmt.Sprintf("/dispatch/%s/queue/", Config.Zone), &etcd.WatcherOptions{Recursive: true})
 	for {
 		r, err := w.Next(ctx)
 		if err != nil {
@@ -95,7 +95,7 @@ func getMachineForUnitConstraints(u unit.Unit) string {
 
 	// TO DO implement constraints
 	machinesForLoad := map[string]float64{}
-	response, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/machines/%s/", Config.Zone), &etcd.GetOptions{Recursive: true})
+	response, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/machines/", Config.Zone), &etcd.GetOptions{Recursive: true})
 	if err != nil {
 		fmt.Println(err)
 		return "" //not important for now
@@ -172,9 +172,9 @@ func getUnit(name string, out chan unit.Unit) {
 }
 
 func assignUnitToMachine(unit, machine string) {
-	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/machines/%s/%s/units/%s", Config.Zone, machine, unit), unit, &etcd.SetOptions{})
-	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/units/%s/%s/machine", Config.Zone, unit), machine, &etcd.SetOptions{})
-	etcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/queue/%s/%s", Config.Zone, unit), &etcd.DeleteOptions{})
+	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/%s/machines/%s/units/%s", Config.Zone, machine, unit), unit, &etcd.SetOptions{})
+	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/%s/units/%s/machine", Config.Zone, unit), machine, &etcd.SetOptions{})
+	etcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/%s/queue/%s", Config.Zone, unit), &etcd.DeleteOptions{})
 }
 
 func setUpEtcd() {

@@ -78,14 +78,14 @@ func Test_newFromEtcd(t *testing.T) {
 
 	unitName := "test-unit.service"
 
-	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/%s", Config.Zone, unitName, "name"), gomock.Any()).Return(&etcd.Response{Node: &etcd.Node{Value: unitName}}, nil)
-	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/%s", Config.Zone, unitName, "machine"), gomock.Any()).Return(&etcd.Response{Node: &etcd.Node{Value: "test-machine"}}, nil)
-	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/%s", Config.Zone, unitName, "global"), gomock.Any()).Return(&etcd.Response{Node: &etcd.Node{Value: ""}}, nil)
-	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/%s", Config.Zone, unitName, "unit"), gomock.Any()).Return(&etcd.Response{Node: &etcd.Node{Value: "test content"}}, nil)
-	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/%s", Config.Zone, unitName, "desiredState"), gomock.Any()).Return(&etcd.Response{Node: &etcd.Node{Value: "active"}}, nil)
-	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/%s", Config.Zone, unitName, "template"), gomock.Any()).Return(&etcd.Response{Node: &etcd.Node{Value: ""}}, nil)
-	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/%s", Config.Zone, unitName, "ports"), gomock.Any()).Return(&etcd.Response{Node: &etcd.Node{Value: "80,443"}}, nil)
-	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/%s", Config.Zone, unitName, "state"), gomock.Any()).Return(&etcd.Response{Node: &etcd.Node{Value: "active"}}, nil)
+	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unitName, "name"), gomock.Any()).Return(&etcd.Response{Node: &etcd.Node{Value: unitName}}, nil)
+	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unitName, "machine"), gomock.Any()).Return(&etcd.Response{Node: &etcd.Node{Value: "test-machine"}}, nil)
+	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unitName, "global"), gomock.Any()).Return(&etcd.Response{Node: &etcd.Node{Value: ""}}, nil)
+	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unitName, "unit"), gomock.Any()).Return(&etcd.Response{Node: &etcd.Node{Value: "test content"}}, nil)
+	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unitName, "desiredState"), gomock.Any()).Return(&etcd.Response{Node: &etcd.Node{Value: "active"}}, nil)
+	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unitName, "template"), gomock.Any()).Return(&etcd.Response{Node: &etcd.Node{Value: ""}}, nil)
+	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unitName, "ports"), gomock.Any()).Return(&etcd.Response{Node: &etcd.Node{Value: "80,443"}}, nil)
+	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unitName, "state"), gomock.Any()).Return(&etcd.Response{Node: &etcd.Node{Value: "active"}}, nil)
 
 	want := Unit{
 		Name:         unitName,
@@ -114,11 +114,11 @@ func Test_start(t *testing.T) {
 
 	unit := getTestUnit()
 
-	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/state", Config.Zone, unit.Name), "starting", gomock.Any())
+	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name), "starting", gomock.Any())
 
 	mockDBus.EXPECT().StartUnit(unit.Name, "fail", gomock.Any())
 
-	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/state", Config.Zone, unit.Name), "active", gomock.Any())
+	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name), "active", gomock.Any())
 
 	unit.Start()
 }
@@ -134,7 +134,7 @@ func Test_stop(t *testing.T) {
 
 	mockDBus.EXPECT().StopUnit(unit.Name, "fail", gomock.Any())
 
-	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/state", Config.Zone, unit.Name), "dead", gomock.Any())
+	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name), "dead", gomock.Any())
 
 	unit.Stop()
 }
@@ -151,7 +151,7 @@ func Test_stopError(t *testing.T) {
 	mockDBus.EXPECT().StopUnit(unit.Name, "fail", gomock.Any()).Return(0, fmt.Errorf("test"))
 	mockDBus.EXPECT().KillUnit(gomock.Any(), gomock.Any())
 
-	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/state", Config.Zone, unit.Name), "dead", gomock.Any())
+	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name), "dead", gomock.Any())
 
 	unit.Stop()
 }
@@ -167,13 +167,13 @@ func Test_restart(t *testing.T) {
 
 	mockDBus.EXPECT().StopUnit(unit.Name, "fail", gomock.Any())
 
-	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/state", Config.Zone, unit.Name), "dead", gomock.Any())
+	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name), "dead", gomock.Any())
 
-	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/state", Config.Zone, unit.Name), "starting", gomock.Any())
+	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name), "starting", gomock.Any())
 
 	mockDBus.EXPECT().StartUnit(unit.Name, "fail", gomock.Any())
 
-	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/state", Config.Zone, unit.Name), "active", gomock.Any())
+	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name), "active", gomock.Any())
 
 	unit.Restart()
 }
@@ -208,7 +208,7 @@ func Test_putOnQueue(t *testing.T) {
 
 	unit := getTestUnit()
 
-	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/queue/%s/%s", Config.Zone, unit.Name), unit.Name, gomock.Any())
+	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/%s/queue/%s", Config.Zone, unit.Name), unit.Name, gomock.Any())
 
 	unit.PutOnQueue()
 }
@@ -228,11 +228,11 @@ func Test_saveOnEtcd(t *testing.T) {
 
 	unit := getTestUnit()
 
-	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/%s", Config.Zone, unit.Name, "name"), unit.Name, gomock.Any())
-	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/%s", Config.Zone, unit.Name, "unit"), unit.UnitContent, gomock.Any())
-	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/%s", Config.Zone, unit.Name, "template"), unit.Template, gomock.Any())
-	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/%s", Config.Zone, unit.Name, "desiredState"), "dead", gomock.Any())
-	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/%s", Config.Zone, unit.Name, "ports"), "80,443", gomock.Any())
+	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, "name"), unit.Name, gomock.Any())
+	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, "unit"), unit.UnitContent, gomock.Any())
+	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, "template"), unit.Template, gomock.Any())
+	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, "desiredState"), "dead", gomock.Any())
+	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, "ports"), "80,443", gomock.Any())
 
 	unit.SaveOnEtcd()
 
@@ -249,13 +249,13 @@ func Test_saveOnEtcdWithGlobal(t *testing.T) {
 	unit := getTestUnit()
 	unit.Global = unit.Name
 
-	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/%s", Config.Zone, unit.Name, "name"), unit.Name, gomock.Any())
-	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/%s", Config.Zone, unit.Name, "unit"), unit.UnitContent, gomock.Any())
-	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/%s", Config.Zone, unit.Name, "template"), unit.Template, gomock.Any())
-	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/%s", Config.Zone, unit.Name, "desiredState"), "dead", gomock.Any())
-	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/%s", Config.Zone, unit.Name, "ports"), "80,443", gomock.Any())
-	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/%s", Config.Zone, unit.Name, "global"), unit.Global, gomock.Any())
-	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/globals/%s/%s", Config.Zone, unit.Name), unit.Name, gomock.Any())
+	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, "name"), unit.Name, gomock.Any())
+	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, "unit"), unit.UnitContent, gomock.Any())
+	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, "template"), unit.Template, gomock.Any())
+	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, "desiredState"), "dead", gomock.Any())
+	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, "ports"), "80,443", gomock.Any())
+	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, "global"), unit.Global, gomock.Any())
+	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/%s/globals/%s", Config.Zone, unit.Name), unit.Name, gomock.Any())
 
 	unit.SaveOnEtcd()
 
@@ -279,10 +279,10 @@ func Test_destroy(t *testing.T) {
 	mockDBus.EXPECT().StopUnit(unit.Name, "fail", gomock.Any())
 	mockDBus.EXPECT().Reload()
 
-	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s/state", Config.Zone, unit.Name), "dead", gomock.Any())
+	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name), "dead", gomock.Any())
 
-	mockEtcd.EXPECT().Delete(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s", Config.Zone, unit.Name), &etcd.DeleteOptions{Recursive: true})
-	mockEtcd.EXPECT().Delete(gomock.Any(), fmt.Sprintf("/dispatch/machines/%s/%s/units/%s", Config.Zone, Config.MachineName, unit.Name), &etcd.DeleteOptions{Recursive: true})
+	mockEtcd.EXPECT().Delete(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s", Config.Zone, unit.Name), &etcd.DeleteOptions{Recursive: true})
+	mockEtcd.EXPECT().Delete(gomock.Any(), fmt.Sprintf("/dispatch/%s/machines/%s/units/%s", Config.Zone, Config.MachineName, unit.Name), &etcd.DeleteOptions{Recursive: true})
 
 	unit.Destroy()
 
@@ -310,9 +310,9 @@ func Test_destroyGlobal(t *testing.T) {
 	mockDBus.EXPECT().StopUnit(unit.Name, "fail", gomock.Any())
 	mockDBus.EXPECT().Reload()
 
-	mockEtcd.EXPECT().Delete(gomock.Any(), fmt.Sprintf("/dispatch/units/%s/%s", Config.Zone, unit.Name), &etcd.DeleteOptions{Recursive: true})
-	mockEtcd.EXPECT().Delete(gomock.Any(), fmt.Sprintf("/dispatch/machines/%s/%s/units/%s", Config.Zone, Config.MachineName, unit.Name), &etcd.DeleteOptions{Recursive: true})
-	mockEtcd.EXPECT().Delete(gomock.Any(), fmt.Sprintf("/dispatch/globals/%s/%s", Config.Zone, unit.Name), gomock.Any())
+	mockEtcd.EXPECT().Delete(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s", Config.Zone, unit.Name), &etcd.DeleteOptions{Recursive: true})
+	mockEtcd.EXPECT().Delete(gomock.Any(), fmt.Sprintf("/dispatch/%s/machines/%s/units/%s", Config.Zone, Config.MachineName, unit.Name), &etcd.DeleteOptions{Recursive: true})
+	mockEtcd.EXPECT().Delete(gomock.Any(), fmt.Sprintf("/dispatch/%s/globals/%s", Config.Zone, unit.Name), gomock.Any())
 
 	unit.Destroy()
 

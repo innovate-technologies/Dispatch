@@ -35,12 +35,12 @@ func Run() {
 func SendCommand(command string) string {
 	id := strconv.Itoa(time.Now().Nanosecond())
 	setUpEtcd()
-	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/commands/%s/%s/command", Config.Zone, id), command, &etcd.SetOptions{TTL: 24 * time.Hour})
+	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/%s/commands/%s/command", Config.Zone, id), command, &etcd.SetOptions{TTL: 24 * time.Hour})
 	return id
 }
 
 func watchForNewCommands() {
-	w := etcdAPI.Watcher(fmt.Sprintf("/dispatch/commands/%s/", Config.Zone), &etcd.WatcherOptions{Recursive: true})
+	w := etcdAPI.Watcher(fmt.Sprintf("/dispatch/%s/commands/", Config.Zone), &etcd.WatcherOptions{Recursive: true})
 	for {
 		r, err := w.Next(ctx)
 		if err != nil {

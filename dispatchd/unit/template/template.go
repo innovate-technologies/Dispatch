@@ -42,7 +42,7 @@ func New() Template {
 // GetAll returns all templates in our zone
 func GetAll() ([]Template, error) {
 	setUpEtcd()
-	response, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/templates/%s", Config.Zone), &etcd.GetOptions{})
+	response, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/templates", Config.Zone), &etcd.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func (t *Template) SaveOnEtcd() {
 // Delete removes the template from etcd
 func (t *Template) Delete() {
 	setUpEtcd()
-	etcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/templates/%s/%s", Config.Zone, t.Name), &etcd.DeleteOptions{Recursive: true})
+	etcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/%s/templates/%s/", Config.Zone, t.Name), &etcd.DeleteOptions{Recursive: true})
 }
 
 // NewUnit created a new unit from the template
@@ -136,7 +136,7 @@ func setUpEtcd() {
 }
 
 func getKeyFromEtcd(unit, key string) string {
-	response, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/templates/%s/%s/%s", Config.Zone, unit, key), &etcd.GetOptions{})
+	response, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/templates/%s/%s", Config.Zone, unit, key), &etcd.GetOptions{})
 	if err != nil {
 		return ""
 	}
@@ -145,5 +145,5 @@ func getKeyFromEtcd(unit, key string) string {
 
 func setKeyOnEtcd(template, key, content string) {
 	fmt.Println(template, key, content)
-	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/templates/%s/%s/%s", Config.Zone, template, key), content, &etcd.SetOptions{})
+	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/%s/templates/%s/%s", Config.Zone, template, key), content, &etcd.SetOptions{})
 }
