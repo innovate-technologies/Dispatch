@@ -97,7 +97,7 @@ func (t *Template) SaveOnEtcd() {
 // Delete removes the template from etcd
 func (t *Template) Delete() {
 	setUpEtcd()
-	etcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/%s/templates/%s/", Config.Zone, t.Name), &etcd.DeleteOptions{Recursive: true})
+	etcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/%s/templates/%s", Config.Zone, t.Name), &etcd.DeleteOptions{Recursive: true})
 }
 
 // NewUnit created a new unit from the template

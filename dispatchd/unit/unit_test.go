@@ -34,7 +34,7 @@ func setUpMockDBus(t *testing.T) (*dbusmock.MockDBusConnectionInterface, *gomock
 }
 
 func setUpConfig() {
-	Config = &config.ConfigurationInfo{Zone: "test"}
+	Config = &config.ConfigurationInfo{Zone: "test", MachineName: "test-machine"}
 }
 
 func getTestUnit() Unit {
@@ -281,6 +281,7 @@ func Test_destroy(t *testing.T) {
 
 	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name), "dead", gomock.Any())
 
+	mockEtcd.EXPECT().Delete(gomock.Any(), fmt.Sprintf("/dispatch/%s/queue/%s", Config.Zone, unit.Name), &etcd.DeleteOptions{Recursive: true})
 	mockEtcd.EXPECT().Delete(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s", Config.Zone, unit.Name), &etcd.DeleteOptions{Recursive: true})
 	mockEtcd.EXPECT().Delete(gomock.Any(), fmt.Sprintf("/dispatch/%s/machines/%s/units/%s", Config.Zone, Config.MachineName, unit.Name), &etcd.DeleteOptions{Recursive: true})
 
@@ -310,6 +311,7 @@ func Test_destroyGlobal(t *testing.T) {
 	mockDBus.EXPECT().StopUnit(unit.Name, "fail", gomock.Any())
 	mockDBus.EXPECT().Reload()
 
+	mockEtcd.EXPECT().Delete(gomock.Any(), fmt.Sprintf("/dispatch/%s/queue/%s", Config.Zone, unit.Name), &etcd.DeleteOptions{Recursive: true})
 	mockEtcd.EXPECT().Delete(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s", Config.Zone, unit.Name), &etcd.DeleteOptions{Recursive: true})
 	mockEtcd.EXPECT().Delete(gomock.Any(), fmt.Sprintf("/dispatch/%s/machines/%s/units/%s", Config.Zone, Config.MachineName, unit.Name), &etcd.DeleteOptions{Recursive: true})
 	mockEtcd.EXPECT().Delete(gomock.Any(), fmt.Sprintf("/dispatch/%s/globals/%s", Config.Zone, unit.Name), gomock.Any())

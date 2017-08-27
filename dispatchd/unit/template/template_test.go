@@ -24,7 +24,7 @@ func setUpMockEtcd(t *testing.T) (*etcdMock.MockKeysAPI, *gomock.Controller) {
 }
 
 func setUpConfig() {
-	Config = &config.ConfigurationInfo{Zone: "test"}
+	Config = &config.ConfigurationInfo{Zone: "test", MachineName: "test-machine"}
 }
 
 func getTestTemplate() Template {
