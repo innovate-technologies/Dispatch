@@ -9,9 +9,9 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/innovate-technologies/Dispatch/dispatchd/config"
 	"github.com/innovate-technologies/Dispatch/dispatchd/unit"
-	"github.com/innovate-technologies/Dispatch/dispatchd/unit/state"
 	"github.com/innovate-technologies/Dispatch/mocks/dbusmock"
 	etcdMock "github.com/innovate-technologies/Dispatch/mocks/etcdmock"
+	"github.com/stretchr/testify/assert"
 )
 
 func setUpMockEtcd(t *testing.T) (*etcdMock.MockKeysAPI, *gomock.Controller) {
@@ -37,6 +37,17 @@ func getTestTemplate() Template {
 	template.onEtcd = false
 
 	return template
+}
+
+func getTestUnit() unit.Unit {
+	unit := unit.New()
+	unit.Name = "test-temp-test"
+	unit.Template = "test-temp-*"
+	unit.Ports = []int64{80, 443}
+	// TO DO: add constraints
+	unit.UnitContent = "hello"
+
+	return unit
 }
 
 func TestNew(t *testing.T) {
@@ -97,17 +108,9 @@ func Test_newUnit(t *testing.T) {
 
 	template := getTestTemplate()
 
-	unitName := "test-temp-test.service"
+	u := template.NewUnit("test", map[string]string{"test": "ok"})
 
-	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unitName, "name"), unitName, gomock.Any())
-	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unitName, "unit"), template.UnitContent, gomock.Any()) // TO DO: add vars
-	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unitName, "template"), template.Name, gomock.Any())
-	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unitName, "desiredState"), state.Active.String(), gomock.Any())
-	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unitName, "ports"), "80,443", gomock.Any())
-
-	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/%s/queue/%s", Config.Zone, unitName), unitName, gomock.Any())
-
-	template.NewUnit("test", map[string]string{"test": "ok"})
+	assert.Equal(t, getTestUnit(), u)
 }
 
 func Test_newFromEtcd(t *testing.T) {
