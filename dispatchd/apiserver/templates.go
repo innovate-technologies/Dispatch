@@ -8,6 +8,12 @@ import (
 	"gopkg.in/labstack/echo.v3"
 )
 
+type templateUnitOptions struct {
+	Name  string            `json:"name" form:"name" query:"name"`
+	Vars  map[string]string `json:"vars" form:"vars" query:"vars"`
+	Ports []int64           `json:"ports" form:"ports" query:"ports"`
+}
+
 func getTemplates(c echo.Context) error {
 	template := template.NewFromEtcd(c.Param("name"))
 	if template.Name == "" {
@@ -77,6 +83,12 @@ func postUnitFromTemplate(c echo.Context) error {
 		info.Vars = map[string]string{}
 	}
 
-	t.NewUnit(info.Name, info.Vars)
+	u := t.NewUnit(info.Name, info.Vars)
+
+	// Allow to override ports
+	if info.Ports != nil && len(info.Ports) > 0 {
+		u.Ports = info.Ports
+	}
+
 	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }

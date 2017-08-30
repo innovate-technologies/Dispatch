@@ -17,11 +17,6 @@ type commandInfo struct {
 	Command string `json:"command" form:"command" query:"command"`
 }
 
-type templateUnitOptions struct {
-	Name string            `json:"name" form:"name" query:"name"`
-	Vars map[string]string `json:"vars" form:"vars" query:"vars"`
-}
-
 // Config is a pointer need to be set to the main configuration
 var Config *config.ConfigurationInfo
 

@@ -100,8 +100,8 @@ func (t *Template) Delete() {
 	etcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/%s/templates/%s", Config.Zone, t.Name), &etcd.DeleteOptions{Recursive: true})
 }
 
-// NewUnit created a new unit from the template
-func (t *Template) NewUnit(name string, vars map[string]string) {
+// NewUnit gives back a new Unit from the template
+func (t *Template) NewUnit(name string, vars map[string]string) unit.Unit {
 	u := unit.New()
 	u.Name = strings.Replace(t.Name, "*", name, -1)
 	u.Template = t.Name
@@ -116,8 +116,7 @@ func (t *Template) NewUnit(name string, vars map[string]string) {
 	unitTemplate.Execute(&unit, vars)
 	u.UnitContent = unit.String()
 
-	u.SaveOnEtcd()
-	u.PutOnQueue()
+	return u
 }
 
 func setUpEtcd() {
