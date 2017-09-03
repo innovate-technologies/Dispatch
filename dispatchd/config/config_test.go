@@ -79,6 +79,27 @@ func Test_readEnv(t *testing.T) {
 			envVal:  "PARIS",
 			want:    &ConfigurationInfo{Zone: "PARIS"},
 		},
+		{
+			name:    "test username",
+			args:    args{conf: &ConfigurationInfo{}},
+			envName: "DISPATCH_ETCD_USERNAME",
+			envVal:  "root",
+			want:    &ConfigurationInfo{EtcdAuth: etcdAuth{Username: "root"}},
+		},
+		{
+			name:    "test password",
+			args:    args{conf: &ConfigurationInfo{}},
+			envName: "DISPATCH_ETCD_PASSWORD",
+			envVal:  "rootpass",
+			want:    &ConfigurationInfo{EtcdAuth: etcdAuth{Password: "rootpass"}},
+		},
+		{
+			name:    "test password",
+			args:    args{conf: &ConfigurationInfo{}},
+			envName: "DISPATCH_ETCD_CA",
+			envVal:  "/etc/ssl/etcd/ca.pem",
+			want:    &ConfigurationInfo{EtcdTLS: etcdTLS{CACert: "/etc/ssl/etcd/ca.pem"}},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

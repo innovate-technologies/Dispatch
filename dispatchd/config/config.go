@@ -6,6 +6,15 @@ import (
 	"runtime"
 )
 
+type etcdAuth struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type etcdTLS struct {
+	CACert string `json:"caCert"`
+}
+
 // ConfigurationInfo contains the config file's content
 type ConfigurationInfo struct {
 	MachineName string            `json:"machineName"`
@@ -15,6 +24,8 @@ type ConfigurationInfo struct {
 	EtcdAddress string            `json:"etcdAddress"`
 	PublicIP    string            `json:"publicIP"`
 	Zone        string            `json:"zone"`
+	EtcdAuth    etcdAuth          `json:"etcdAuth"`
+	EtcdTLS     etcdTLS           `json:"etcdTLS"`
 }
 
 func newConfigurationInfo() ConfigurationInfo {
@@ -54,5 +65,14 @@ func readEnv(conf *ConfigurationInfo) {
 	}
 	if zone := os.Getenv("DISPATCH_ZONE"); zone != "" {
 		conf.Zone = zone
+	}
+	if username := os.Getenv("DISPATCH_ETCD_USERNAME"); username != "" {
+		conf.EtcdAuth.Username = username
+	}
+	if password := os.Getenv("DISPATCH_ETCD_PASSWORD"); password != "" {
+		conf.EtcdAuth.Password = password
+	}
+	if ca := os.Getenv("DISPATCH_ETCD_CA"); ca != "" {
+		conf.EtcdTLS.CACert = ca
 	}
 }
