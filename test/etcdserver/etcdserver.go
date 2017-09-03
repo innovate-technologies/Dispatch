@@ -34,4 +34,5 @@ func Stop() {
 	e.Server.Stop()
 	e.Close()
 	os.RemoveAll("default.etcd")
+	time.Sleep(500 * time.Millisecond) // trying to ensure free sockets
 }
