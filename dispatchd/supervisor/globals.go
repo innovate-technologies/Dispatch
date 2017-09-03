@@ -1,11 +1,8 @@
 package supervisor
 
-import (
-	"fmt"
+func watchGlobals() {}
 
-	etcd "github.com/coreos/etcd/client"
-)
-
+/*
 func watchGlobals() {
 	w := etcdAPI.Watcher(fmt.Sprintf("/dispatch/%s/globals/", Config.Zone), &etcd.WatcherOptions{Recursive: true})
 	for {
@@ -36,3 +33,5 @@ func watchGlobals() {
 	}
 
 }
+
+*/

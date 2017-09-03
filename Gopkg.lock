@@ -22,8 +22,8 @@
 [[projects]]
   name = "github.com/coreos/etcd"
   packages = ["alarm","auth","auth/authpb","client","clientv3","clientv3/concurrency","compactor","discovery","embed","error","etcdserver","etcdserver/api","etcdserver/api/etcdhttp","etcdserver/api/v2http","etcdserver/api/v2http/httptypes","etcdserver/api/v3client","etcdserver/api/v3election","etcdserver/api/v3election/v3electionpb","etcdserver/api/v3election/v3electionpb/gw","etcdserver/api/v3lock","etcdserver/api/v3lock/v3lockpb","etcdserver/api/v3lock/v3lockpb/gw","etcdserver/api/v3rpc","etcdserver/api/v3rpc/rpctypes","etcdserver/auth","etcdserver/etcdserverpb","etcdserver/etcdserverpb/gw","etcdserver/membership","etcdserver/stats","lease","lease/leasehttp","lease/leasepb","mvcc","mvcc/backend","mvcc/mvccpb","pkg/adt","pkg/contention","pkg/cors","pkg/cpuutil","pkg/crc","pkg/debugutil","pkg/fileutil","pkg/httputil","pkg/idutil","pkg/ioutil","pkg/logutil","pkg/monotime","pkg/netutil","pkg/pathutil","pkg/pbutil","pkg/runtime","pkg/schedule","pkg/srv","pkg/tlsutil","pkg/transport","pkg/types","pkg/wait","proxy/grpcproxy/adapter","raft","raft/raftpb","rafthttp","snap","snap/snappb","store","version","wal","wal/walpb"]
-  revision = "9d43462d174c664f5edf313dec0de31e1ef4ed47"
-  version = "v3.2.6"
+  revision = "bb66589f8cf18960c7f3d56b1b83753caeed9c7a"
+  version = "v3.2.7"
 
 [[projects]]
   name = "github.com/coreos/go-semver"
@@ -215,7 +215,7 @@
   branch = "master"
   name = "github.com/spf13/afero"
   packages = [".","mem"]
-  revision = "36f8810e2e3d7eeac4ac05b57f65690fbfba62a2"
+  revision = "ee1bd8ee15a1306d1f9201acc41ef39cd9f99a1b"
 
 [[projects]]
   name = "github.com/spf13/cast"
@@ -227,13 +227,13 @@
   branch = "master"
   name = "github.com/spf13/cobra"
   packages = ["."]
-  revision = "2df9a531813370438a4d79bfc33e21f58063ed87"
+  revision = "3c0b56b677e04926dfa835a1b3f11cd4f62f076e"
 
 [[projects]]
   branch = "master"
   name = "github.com/spf13/jwalterweatherman"
   packages = ["."]
-  revision = "0efa5202c04663c757d84f90f5219c1250baf94f"
+  revision = "12bd96e66386c1960ab0f74ced1362f66f552f7b"
 
 [[projects]]
   name = "github.com/spf13/pflag"
@@ -292,13 +292,13 @@
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  revision = "2d6f6f883a06fc0d5f4b14a81e4c28705ea64c15"
+  revision = "7ddbeae9ae08c6a06a59597f0c9edbc5ff2444ce"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/text"
   packages = ["internal/gen","internal/triegen","internal/ucd","secure/bidirule","transform","unicode/bidi","unicode/cldr","unicode/norm","unicode/rangetable"]
-  revision = "ac87088df8ef557f1e32cd00ed0b6fbc3f7ddafb"
+  revision = "bd91bbf73e9a4a801adbfb97133c992678533126"
 
 [[projects]]
   branch = "master"
@@ -311,12 +311,6 @@
   packages = [".","codes","connectivity","credentials","grpclb/grpc_lb_v1/messages","grpclog","internal","keepalive","metadata","naming","peer","stats","status","tap","transport"]
   revision = "f92cdcd7dcdc69e81b2d7b338479a19a8723cfa3"
   version = "v1.6.0"
-
-[[projects]]
-  name = "gopkg.in/coreos/etcd.v3"
-  packages = ["embed"]
-  revision = "bb66589f8cf18960c7f3d56b1b83753caeed9c7a"
-  version = "v3.2.7"
 
 [[projects]]
   name = "gopkg.in/labstack/echo.v3"
@@ -339,6 +333,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "b694a22db0c868f2a26dc6688f1e1427f509652d46ece483b20291b9d19fda2a"
+  inputs-digest = "cf5537bc81b370bfbd72f852fa9935e7e26319fbb19e1191f3cccb6e8af918a6"
   solver-name = "gps-cdcl"
   solver-version = 1
