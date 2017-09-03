@@ -7,18 +7,19 @@ import (
 	"time"
 
 	"github.com/innovate-technologies/Dispatch/dispatchd/config"
+	"github.com/innovate-technologies/Dispatch/dispatchd/etcdclient"
 	"github.com/innovate-technologies/Dispatch/dispatchd/unit"
 	"github.com/innovate-technologies/Dispatch/dispatchd/unit/template"
 
 	"strconv"
 
-	etcd "github.com/coreos/etcd/client"
+	etcd "github.com/coreos/etcd/clientv3"
 	"golang.org/x/net/context"
 )
 
 var (
 	ctx     = context.Background()
-	etcdAPI etcd.KeysAPI
+	etcdAPI = etcdclient.GetEtcdv3()
 	// Config is a pointer need to be set to the main configuration
 	Config     *config.ConfigurationInfo
 	queueMutex = &sync.Mutex{}
@@ -26,7 +27,6 @@ var (
 
 // Run checks for waiting units and assigns them
 func Run() {
-	setUpEtcd()
 	importExisting()
 	go watchQueue()
 	go checkQueue() // make sure to not forget the unsatisfiable
@@ -34,11 +34,8 @@ func Run() {
 
 // AddUnit adds a unit to the queue
 func AddUnit(name string) {
-	if etcdAPI == nil {
-		setUpEtcd()
-	}
-	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/%s/queue/%s", Config.Zone, name), name, &etcd.SetOptions{})
-	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/%s/units/%s/machine", Config.Zone, name), "", &etcd.SetOptions{})
+	etcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/queue/%s", Config.Zone, name), name)
+	etcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/units/%s/machine", Config.Zone, name), "")
 }
 
 func checkQueue() {
@@ -50,29 +47,26 @@ func checkQueue() {
 
 func importExisting() {
 	queueMutex.Lock()
-	response, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/queue/", Config.Zone), &etcd.GetOptions{})
+	response, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/queue/", Config.Zone), etcd.WithPrefix())
 	if err != nil {
 		return
 	}
-	for _, node := range response.Node.Nodes {
-		go assignUnit(node.Value)
+	for _, kv := range response.Kvs {
+		go assignUnit(string(kv.Value))
 	}
 	queueMutex.Unlock()
 }
 
 func watchQueue() {
-	w := etcdAPI.Watcher(fmt.Sprintf("/dispatch/%s/queue/", Config.Zone), &etcd.WatcherOptions{Recursive: true})
-	for {
-		r, err := w.Next(ctx)
-		if err != nil {
-			go watchQueue()
-			return
+	chans := etcdAPI.Watch(context.Background(), fmt.Sprintf("/dispatch/%s/queue", Config.Zone), etcd.WithPrefix())
+	for resp := range chans {
+		for _, ev := range resp.Events {
+			if ev.IsCreate() {
+				queueMutex.Lock()
+				go assignUnit(string(ev.Kv.Value))
+				queueMutex.Unlock()
+			}
 		}
-		queueMutex.Lock()
-		if r.Action == "set" {
-			go assignUnit(r.Node.Value)
-		}
-		queueMutex.Unlock()
 	}
 }
 
@@ -85,6 +79,11 @@ func assignUnit(name string) {
 	}
 }
 
+type machineInfoContent struct {
+	Load  float64
+	Units []string
+}
+
 func getMachineForUnitConstraints(u unit.Unit) string {
 	// contraints := u.Constraints
 	ports := u.Ports
@@ -95,34 +94,41 @@ func getMachineForUnitConstraints(u unit.Unit) string {
 
 	// TO DO implement constraints
 	machinesForLoad := map[string]float64{}
-	response, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/machines/", Config.Zone), &etcd.GetOptions{Recursive: true})
+	response, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/machines/", Config.Zone), etcd.WithPrefix())
 	if err != nil {
 		fmt.Println(err)
 		return "" //not important for now
 	}
-	for _, machine := range response.Node.Nodes {
-		machineNameParts := strings.Split(machine.Key, "/")
 
-		machineName := machineNameParts[len(machineNameParts)-1]
-		var load float64
-		unitNames := []string{}
+	machineInfo := map[string]machineInfoContent{}
 
-		for _, key := range machine.Nodes {
-			keyParts := strings.Split(key.Key, "/")
-			if keyParts[len(keyParts)-1] == "load" {
-				load, _ = strconv.ParseFloat(key.Value, 64)
+	for _, key := range response.Kvs {
+		keyParts := strings.Split(string(key.Key), "/")
+		machineName := keyParts[4]
+		if keyParts[5] == "load" {
+			if _, ok := machineInfo[machineName]; !ok {
+				machineInfo[machineName] = machineInfoContent{}
 			}
-			if keyParts[len(keyParts)-1] == "units" {
-				for _, unit := range key.Nodes {
-					unitNames = append(unitNames, unit.Value)
-				}
-			}
+			info := machineInfo[machineName]
+			info.Load, _ = strconv.ParseFloat(string(key.Value), 64)
+			machineInfo[machineName] = info
 		}
 
+		if keyParts[5] == "units" {
+			if _, ok := machineInfo[machineName]; !ok {
+				machineInfo[machineName] = machineInfoContent{}
+			}
+			info := machineInfo[machineName]
+			info.Units = append(info.Units, string(key.Value))
+			machineInfo[machineName] = info
+		}
+	}
+
+	for machine := range machineInfo {
 		goCount := 0
 		unitChan := make(chan unit.Unit)
 		units := []unit.Unit{}
-		for _, unitName := range unitNames {
+		for _, unitName := range machineInfo[machine].Units {
 			go getUnit(unitName, unitChan)
 			goCount++
 		}
@@ -151,7 +157,7 @@ func getMachineForUnitConstraints(u unit.Unit) string {
 			}
 		}
 		if allPortsAvailable && (numSameTemplate < unitTemplate.MaxPerMachine || unitTemplate.MaxPerMachine == 0) { // check ports and template constraints
-			machinesForLoad[machineName] = load
+			machinesForLoad[machine] = machineInfo[machine].Load
 		}
 	}
 	isCompared := false
@@ -172,19 +178,7 @@ func getUnit(name string, out chan unit.Unit) {
 }
 
 func assignUnitToMachine(unit, machine string) {
-	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/%s/machines/%s/units/%s", Config.Zone, machine, unit), unit, &etcd.SetOptions{})
-	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/%s/units/%s/machine", Config.Zone, unit), machine, &etcd.SetOptions{})
-	etcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/%s/queue/%s", Config.Zone, unit), &etcd.DeleteOptions{})
-}
-
-func setUpEtcd() {
-	c, err := etcd.New(etcd.Config{
-		Endpoints:               []string{Config.EtcdAddress},
-		Transport:               etcd.DefaultTransport,
-		HeaderTimeoutPerRequest: 10 * time.Second,
-	})
-	if err != nil {
-		panic(err)
-	}
-	etcdAPI = etcd.NewKeysAPI(c)
+	etcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/machines/%s/units/%s", Config.Zone, machine, unit), unit)
+	etcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/units/%s/machine", Config.Zone, unit), machine)
+	etcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/%s/queue/%s", Config.Zone, unit))
 }

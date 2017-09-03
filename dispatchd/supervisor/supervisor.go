@@ -5,67 +5,77 @@ import (
 	"strings"
 	"time"
 
+	"github.com/coreos/etcd/mvcc/mvccpb"
+
+	etcd "github.com/coreos/etcd/clientv3"
 	"github.com/innovate-technologies/Dispatch/dispatchd/config"
+	"github.com/innovate-technologies/Dispatch/dispatchd/etcdclient"
 	"github.com/innovate-technologies/Dispatch/dispatchd/supervisor/queue"
 
-	etcd "github.com/coreos/etcd/client"
 	"golang.org/x/net/context"
 )
 
 var (
 	ctx     = context.Background()
-	etcdAPI etcd.KeysAPI
+	etcdAPI = etcdclient.GetEtcdv3()
 	// Config is a pointer need to be set to the main configuration
 	Config *config.ConfigurationInfo
 	// IsSupervisor indicates if this machine is the supervisor
 	IsSupervisor = false
+	aliveLease   *etcd.LeaseGrantResponse
 )
 
 // Run checks for a supervisor and becomes supervisor when needed
 func Run() {
-	setUpEtcd()
-	checkSupervisorAlive()
+	if !isSupervisorAlive() {
+		election()
+	}
 	go watchToBecomeSupervisor()
 }
 
-func checkSupervisorAlive() {
-	_, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/supervisor/alive", Config.Zone), &etcd.GetOptions{})
-	if err != nil {
-		election()
+func isSupervisorAlive() bool {
+	key, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/supervisor/alive", Config.Zone))
+	if err != nil || len(key.Kvs) == 0 {
+		return false
 	}
+	return true
 }
 
 func election() {
-	voteKey := voteForSupervisor()
+	voteForSupervisor()
 	winner := getWinningVote()
-	if winner == voteKey {
+	if winner == Config.MachineName {
 		fmt.Println("Becoming supervisor")
 		becomeSupervisor()
 	}
 }
 
-func voteForSupervisor() string {
+func voteForSupervisor() {
 	fmt.Println("Voting for new supervisor")
-	res, err := etcdAPI.CreateInOrder(ctx, fmt.Sprintf("/dispatch/%s/vote/", Config.Zone), Config.MachineName, &etcd.CreateInOrderOptions{TTL: 10 * time.Second})
+	lease, err := etcdAPI.Lease.Grant(ctx, 10)
 	if err != nil {
 		panic(err)
 	}
-	return res.Node.Key
 
+	etcdAPI.Txn(ctx).
+		If(etcd.Compare(etcd.CreateRevision(fmt.Sprintf("/dispatch/%s/vote", Config.Zone)), "=", 0)).
+		Then(etcd.OpPut(fmt.Sprintf("/dispatch/%s/vote", Config.Zone), Config.MachineName, etcd.WithLease(lease.ID))).
+		Commit()
 }
 
 func getWinningVote() string {
-	res, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/vote/", Config.Zone), &etcd.GetOptions{Recursive: true, Sort: true})
+	key, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/vote", Config.Zone))
 	if err != nil {
 		panic(err)
 	}
-	return res.Node.Nodes[0].Key
+	return string(key.Kvs[0].Value)
 }
 
 func becomeSupervisor() {
 	IsSupervisor = true
-	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/%s/supervisor/alive", Config.Zone), "1", &etcd.SetOptions{TTL: 10 * time.Second})
-	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/%s/supervisor/machine", Config.Zone), Config.MachineName, &etcd.SetOptions{})
+	aliveLease, _ = etcdAPI.Lease.Grant(ctx, 10)
+	etcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/supervisor/alive", Config.Zone), "1", etcd.WithLease(aliveLease.ID))
+	etcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/supervisor/machine", Config.Zone), Config.MachineName, etcd.WithLease(aliveLease.ID))
 	go letPeasantsKnow()
 	go watchMachines()
 	go watchGlobals()
@@ -76,7 +86,7 @@ func becomeSupervisor() {
 // letPeasantsKnow makes sure everybody knows you're not dead
 func letPeasantsKnow() {
 	for {
-		etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/%s/supervisor/alive", Config.Zone), "", &etcd.SetOptions{TTL: 10 * time.Second, Refresh: true})
+		etcdAPI.Lease.KeepAliveOnce(ctx, aliveLease.ID)
 		time.Sleep(1 * time.Second)
 	}
 }
@@ -85,88 +95,84 @@ func watchToBecomeSupervisor() {
 	if IsSupervisor {
 		return // why would you watch yourself?
 	}
-	w := etcdAPI.Watcher(fmt.Sprintf("/dispatch/%s/supervisor/alive", Config.Zone), &etcd.WatcherOptions{})
-	for {
-		r, err := w.Next(ctx)
-		if err != nil {
-			go watchToBecomeSupervisor()
-			return
-		}
-		if r.Action == "expire" {
-			election()
+	chans := etcdAPI.Watch(context.Background(), fmt.Sprintf("/dispatch/%s/supervisor/alive", Config.Zone))
+L:
+	for resp := range chans {
+		for _, ev := range resp.Events {
+			if ev.Type == mvccpb.DELETE {
+				election()
+				break L
+			}
 		}
 	}
+
+	fmt.Println("DEBUG end alive watch")
+
 }
 
 func watchMachines() {
 	go checkForDeadMachines() // clean out the dead on arrival ones
-	w := etcdAPI.Watcher(fmt.Sprintf("/dispatch/%s/machines/", Config.Zone), &etcd.WatcherOptions{Recursive: true})
-	for {
-		r, err := w.Next(ctx)
-		if err != nil {
-			watchMachines()
-			return
-		}
+	chans := etcdAPI.Watch(context.Background(), fmt.Sprintf("/dispatch/%s/machines/", Config.Zone), etcd.WithPrefix())
+	for resp := range chans {
+		for _, ev := range resp.Events {
+			if keyComponents := strings.Split(string(ev.Kv.Key), "/"); keyComponents[len(keyComponents)-1] == "alive" {
+				machineKey := strings.Join(keyComponents[:5], "/")
 
-		if keyComponents := strings.Split(r.Node.Key, "/"); keyComponents[len(keyComponents)-1] == "alive" {
-			machineKey := strings.Join(keyComponents[:len(keyComponents)-1], "/")
-			// if died
-			if r.Action == "expire" {
-				fmt.Println(keyComponents[len(keyComponents)-2], "died")
-				foundDeadMachine(machineKey)
-			}
+				// if died
+				if ev.Type == mvccpb.DELETE {
+					fmt.Println(keyComponents[len(keyComponents)-2], "died")
+					foundDeadMachine(machineKey)
+				}
 
-			// if new
-			if r.Action == "set" {
-				fmt.Println(keyComponents[len(keyComponents)-2], "is alive")
-				foundNewMachine(machineKey)
+				// if new
+				if ev.IsCreate() {
+
+					fmt.Println(machineKey, "is alive")
+					foundNewMachine(machineKey)
+				}
 			}
 		}
 	}
 }
 
 func checkForDeadMachines() {
-	response, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/machines/", Config.Zone), &etcd.GetOptions{})
+	response, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/machines/", Config.Zone), etcd.WithPrefix())
 	if err != nil {
 		return //not important for now
 	}
-	for _, node := range response.Node.Nodes {
-		_, err := etcdAPI.Get(ctx, fmt.Sprintf("%s/alive", node.Key), &etcd.GetOptions{})
-		if err != nil {
-			fmt.Println(node.Key, "dead at arrival")
-			foundDeadMachine(node.Key)
+
+	serversHad := map[string]bool{}
+	for _, kv := range response.Kvs {
+		keyParts := strings.Split(string(kv.Key), "/")
+		machine := keyParts[4]
+
+		if _, ok := serversHad[machine]; !ok {
+			key := strings.Join(keyParts[:5], "/")
+			res, err := etcdAPI.Get(ctx, fmt.Sprintf("%s/alive", key))
+			if err != nil || res.Count == 0 {
+				fmt.Println(key, "dead at arrival")
+				foundDeadMachine(key)
+			}
 		}
 	}
 }
 
 func foundDeadMachine(key string) {
-	result, err := etcdAPI.Get(ctx, key+"/units", &etcd.GetOptions{Recursive: true})
+	result, err := etcdAPI.Get(ctx, key+"/units", etcd.WithPrefix())
 	if err == nil {
-		for _, node := range result.Node.Nodes {
-			go queue.AddUnit(node.Value)
+		for _, kv := range result.Kvs {
+			queue.AddUnit(string(kv.Value))
 		}
 	}
-	etcdAPI.Delete(ctx, key, &etcd.DeleteOptions{Recursive: true, Dir: true})
+	etcdAPI.Delete(ctx, key, etcd.WithPrefix())
 }
 
 func foundNewMachine(key string) {
 	// set globals
-	result, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/globals/", Config.Zone), &etcd.GetOptions{Recursive: true})
+	result, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/globals/", Config.Zone), etcd.WithPrefix())
 	if err == nil {
-		for _, node := range result.Node.Nodes {
-			go etcdAPI.Set(ctx, key+"/units/"+node.Value, node.Value, &etcd.SetOptions{})
+		for _, kv := range result.Kvs {
+			etcdAPI.Put(ctx, key+"/units/"+string(kv.Value), string(kv.Value))
 		}
 	}
-}
-
-func setUpEtcd() {
-	c, err := etcd.New(etcd.Config{
-		Endpoints:               []string{Config.EtcdAddress},
-		Transport:               etcd.DefaultTransport,
-		HeaderTimeoutPerRequest: 10 * time.Second,
-	})
-	if err != nil {
-		panic(err)
-	}
-	etcdAPI = etcd.NewKeysAPI(c)
 }
