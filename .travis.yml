@@ -5,12 +5,17 @@ install:
 - go get -d -v ./...
 - go vet ./...
 - go test ./...
-- cd dispatchd && go build -v ./ && mv dispatchd dispatchd-linux-amd64 && cd ..
-- cd dispatchd && GOARCH=arm go build -v ./ && mv dispatchd dispatchd-linux-arm && cd ..
-- cd dispatchd && GOARCH=arm64 go build -v ./ && mv dispatchd dispatchd-linux-arm64 && cd ..
-- cd dispatchctl && go build -v ./ && mv dispatchctl dispatchctl-linux-amd64 && cd ..
-- cd dispatchctl && GOARCH=arm go build -v ./ && mv dispatchctl dispatchctl-linux-arm && cd ..
-- cd dispatchctl && GOARCH=arm64 go build -v ./ && mv dispatchctl dispatchctl-linux-arm64 && cd ..
+- go test -race -coverprofile=coverage.txt -covermode=atomic
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
+  - cd dispatchd && go build -v ./ && mv dispatchd dispatchd-linux-amd64 && cd ..
+  - cd dispatchd && GOARCH=arm go build -v ./ && mv dispatchd dispatchd-linux-arm && cd ..
+  - cd dispatchd && GOARCH=arm64 go build -v ./ && mv dispatchd dispatchd-linux-arm64 && cd ..
+  - cd dispatchctl && go build -v ./ && mv dispatchctl dispatchctl-linux-amd64 && cd ..
+  - cd dispatchctl && GOARCH=arm go build -v ./ && mv dispatchctl dispatchctl-linux-arm && cd ..
+  - cd dispatchctl && GOARCH=arm64 go build -v ./ && mv dispatchctl dispatchctl-linux-arm64 && cd ..
+
 deploy:
   skip_cleanup: true
   provider: releases
