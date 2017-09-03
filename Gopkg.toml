@@ -57,6 +57,6 @@
   name = "gopkg.in/resty.v0"
   version = "0.13.0"
 
-[[constraint]]
+[[override]]
   name = "google.golang.org/grpc"
   version = "v1.2.1"
