@@ -9,6 +9,7 @@ import (
 )
 
 var e *embed.Etcd
+var failCount int
 
 // Start starts an embedded etcd server for testing
 func Start() {
@@ -17,8 +18,16 @@ func Start() {
 	var err error
 	e, err = embed.StartEtcd(cfg)
 	if err != nil {
-		log.Fatal(err)
+		failCount++
+		if failCount < 15 {
+			time.Sleep(200 * time.Millisecond)
+			Start()
+		} else {
+			log.Fatal(err)
+		}
+		return
 	}
+	failCount = 0
 	select {
 	case <-e.Server.ReadyNotify():
 		log.Printf("Server is ready!")
@@ -34,5 +43,4 @@ func Stop() {
 	e.Server.Stop()
 	e.Close()
 	os.RemoveAll("default.etcd")
-	time.Sleep(500 * time.Millisecond) // trying to ensure free sockets
 }
