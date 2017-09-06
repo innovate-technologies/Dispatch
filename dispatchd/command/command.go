@@ -7,19 +7,17 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/innovate-technologies/Dispatch/dispatchd/config"
+	"github.com/innovate-technologies/Dispatch/dispatchd/etcdclient"
 
-	"strconv"
-
-	etcd "github.com/coreos/etcd/client"
+	etcd "github.com/coreos/etcd/clientv3"
 	"golang.org/x/net/context"
 )
 
 var (
 	ctx     = context.Background()
-	etcdAPI etcd.KeysAPI
+	etcdAPI = etcdclient.GetEtcdv3()
 	// Config is a pointer need to be set to the main configuration
 	Config    *config.ConfigurationInfo
 	etcdMutex = &sync.Mutex{}
@@ -27,28 +25,23 @@ var (
 
 // Run starts watching for commands to execute
 func Run() {
-	setUpEtcd()
 	go watchForNewCommands()
 }
 
 // SendCommand places a command to be ran on etcd
 func SendCommand(command string) string {
-	id := strconv.Itoa(time.Now().Nanosecond())
-	setUpEtcd()
-	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/%s/commands/%s/command", Config.Zone, id), command, &etcd.SetOptions{TTL: 24 * time.Hour})
-	return id
+	lease, _ := etcdAPI.Lease.Grant(ctx, 60*60*60*24) //24h
+	etcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/commands/%d/command", Config.Zone, lease.ID), command, etcd.WithLease(lease.ID))
+	return fmt.Sprintf("%d", lease.ID)
 }
 
 func watchForNewCommands() {
-	w := etcdAPI.Watcher(fmt.Sprintf("/dispatch/%s/commands/", Config.Zone), &etcd.WatcherOptions{Recursive: true})
-	for {
-		r, err := w.Next(ctx)
-		if err != nil {
-			go watchForNewCommands()
-			return
-		}
-		if pathParts := strings.Split(r.Node.Key, "/"); r.Action == "set" && pathParts[len(pathParts)-1] == "command" {
-			go executeAndReturnResults(strings.Join(pathParts[:len(pathParts)-1], "/"), r.Node.Value)
+	chans := etcdAPI.Watch(ctx, fmt.Sprintf("/dispatch/%s/commands", Config.Zone), etcd.WithPrefix())
+	for resp := range chans {
+		for _, ev := range resp.Events {
+			if pathParts := strings.Split(string(ev.Kv.Key), "/"); ev.IsCreate() && pathParts[len(pathParts)-1] == "command" {
+				go executeAndReturnResults(strings.Join(pathParts[:len(pathParts)-1], "/"), string(ev.Kv.Value))
+			}
 		}
 	}
 }
@@ -57,7 +50,7 @@ func executeAndReturnResults(key, command string) {
 	fmt.Println(key) // TO DO execute and push info to etcd
 	fmt.Println(command)
 
-	etcdAPI.Set(ctx, fmt.Sprintf("%s/machines/%s/output", key, Config.MachineName), "", &etcd.SetOptions{})
+	etcdAPI.Put(ctx, fmt.Sprintf("%s/machines/%s/output", key, Config.MachineName), "")
 
 	commandParts := strings.Split(command, " ")
 	commandoProcess := exec.Command(commandParts[0], commandParts[1:]...)
@@ -74,7 +67,7 @@ func executeAndReturnResults(key, command string) {
 		err = errors.New("ok")
 	}
 	fmt.Println("done")
-	etcdAPI.Set(ctx, fmt.Sprintf("%s/machines/%s/result", key, Config.MachineName), err.Error(), &etcd.SetOptions{})
+	etcdAPI.Put(ctx, fmt.Sprintf("%s/machines/%s/result", key, Config.MachineName), err.Error())
 }
 
 func readSdtToEtcd(key string, std *bufio.Reader) {
@@ -85,21 +78,16 @@ func readSdtToEtcd(key string, std *bufio.Reader) {
 			return // end of stream
 		}
 		etcdMutex.Lock()
-		response, _ := etcdAPI.Get(ctx, outputPath, &etcd.GetOptions{})
-		output := response.Node.Value + string(line[:]) + "\n"
-		etcdAPI.Set(ctx, outputPath, output, &etcd.SetOptions{TTL: 24 * time.Hour})
+
+		var output string
+		if response, _ := etcdAPI.Get(ctx, outputPath); response.Count == 0 {
+			output = string(line[:]) + "\n"
+		} else {
+			output = string(response.Kvs[0].Value) + string(line[:]) + "\n"
+		}
+
+		lease, _ := etcdAPI.Lease.Grant(ctx, 60*60*60*24) //24h
+		etcdAPI.Put(ctx, outputPath, output, etcd.WithLease(lease.ID))
 		etcdMutex.Unlock()
 	}
-}
-
-func setUpEtcd() {
-	c, err := etcd.New(etcd.Config{
-		Endpoints:               []string{Config.EtcdAddress},
-		Transport:               etcd.DefaultTransport,
-		HeaderTimeoutPerRequest: 10 * time.Second,
-	})
-	if err != nil {
-		panic(err)
-	}
-	etcdAPI = etcd.NewKeysAPI(c)
 }
