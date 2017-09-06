@@ -7,35 +7,43 @@ import (
 	"time"
 
 	"github.com/innovate-technologies/Dispatch/dispatchd/config"
+	"github.com/innovate-technologies/Dispatch/dispatchd/etcdclient"
 	"github.com/innovate-technologies/Dispatch/dispatchd/unit"
 
-	etcd "github.com/coreos/etcd/client"
+	etcd "github.com/coreos/etcd/clientv3"
+	"github.com/coreos/etcd/mvcc/mvccpb"
 	"golang.org/x/net/context"
 )
 
 var (
 	ctx             = context.Background()
-	etcdAPI         etcd.KeysAPI
+	etcdAPI         = etcdclient.GetEtcdv3()
 	machineLocation string
 	// Config is a pointer need to be set to the main configuration
-	Config *config.ConfigurationInfo
-	units  map[string]unit.Unit
+	Config     *config.ConfigurationInfo
+	units      map[string]unit.Unit
+	aliveLease *etcd.LeaseGrantResponse
 )
 
 // RegisterMachine adds the machine to the cluster
 func RegisterMachine() {
 	unit.KillAllOldUnits() // Starting clean
-	setUpEtcd()
 
 	unit.Config = Config           // pass through the config
 	units = map[string]unit.Unit{} // initialize map
 
 	machineLocation = fmt.Sprintf("/dispatch/%s/machines/%s", Config.Zone, Config.MachineName)
 
-	etcdAPI.Set(ctx, machineLocation+"/arch", Config.Arch, &etcd.SetOptions{})
-	etcdAPI.Set(ctx, machineLocation+"/ip", Config.PublicIP, &etcd.SetOptions{})
+	etcdAPI.Put(ctx, machineLocation+"/arch", Config.Arch)
+	etcdAPI.Put(ctx, machineLocation+"/ip", Config.PublicIP)
 
-	etcdAPI.Set(ctx, machineLocation+"/alive", "1", &etcd.SetOptions{TTL: 10 * time.Second})
+	var err error
+	aliveLease, err = etcdAPI.Lease.Grant(ctx, 10)
+	if err != nil {
+		panic(err)
+	}
+
+	etcdAPI.Put(ctx, machineLocation+"/alive", "1", etcd.WithLease(aliveLease.ID))
 
 	go renewAlive()
 	go updateLoad()
@@ -45,7 +53,7 @@ func RegisterMachine() {
 
 func renewAlive() {
 	for {
-		etcdAPI.Set(ctx, machineLocation+"/alive", "", &etcd.SetOptions{TTL: 10 * time.Second, Refresh: true})
+		etcdAPI.Lease.KeepAliveOnce(ctx, aliveLease.ID)
 		time.Sleep(1 * time.Second)
 	}
 }
@@ -62,22 +70,10 @@ func updateLoad() {
 				textAfterLoadAverage = strings.Split(uptimeString, "load average: ")[1]
 			}
 			load := strings.Split(textAfterLoadAverage, ",")[0] //to do: divide #CPU
-			etcdAPI.Set(ctx, machineLocation+"/load", load, &etcd.SetOptions{})
+			etcdAPI.Put(ctx, machineLocation+"/load", load)
 		}
 		time.Sleep(1 * time.Second)
 	}
-}
-
-func setUpEtcd() {
-	c, err := etcd.New(etcd.Config{
-		Endpoints:               []string{Config.EtcdAddress},
-		Transport:               etcd.DefaultTransport,
-		HeaderTimeoutPerRequest: 10 * time.Second,
-	})
-	if err != nil {
-		panic(err)
-	}
-	etcdAPI = etcd.NewKeysAPI(c)
 }
 
 func setTags(tags map[string]string) {
@@ -85,34 +81,34 @@ func setTags(tags map[string]string) {
 }
 
 func startUnits() {
-	result, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/machines/%s/units", Config.Zone, Config.MachineName), &etcd.GetOptions{Recursive: true})
+	result, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/machines/%s/units", Config.Zone, Config.MachineName))
 	if err == nil {
-		for _, node := range result.Node.Nodes {
-			u := unit.NewFromEtcd(node.Value)
+		for _, kv := range result.Kvs {
+			unitName := string(kv.Value)
+			u := unit.NewFromEtcd(unitName)
 			go u.LoadAndWatch()
-			units[node.Value] = u
+			units[unitName] = u
 		}
 	}
 	go watchUnits()
 }
 
 func watchUnits() {
-	w := etcdAPI.Watcher(machineLocation+"/units", &etcd.WatcherOptions{Recursive: true})
-	for {
-		r, err := w.Next(ctx)
-		if err != nil {
-			go watchUnits()
-			return
-		}
-		if r.Action == "set" {
-			u := unit.NewFromEtcd(r.Node.Value)
-			go u.LoadAndWatch()
-			units[r.Node.Value] = u
-		}
-		if r.Action == "delete" {
-			if unit, exists := units[r.PrevNode.Value]; exists {
-				unit.Destroy()
-				delete(units, r.PrevNode.Value)
+	chans := etcdAPI.Watch(context.Background(), fmt.Sprintf("/dispatch/%s/queue", Config.Zone), etcd.WithPrefix())
+	for resp := range chans {
+		for _, ev := range resp.Events {
+			if ev.IsCreate() {
+				unitName := string(ev.Kv.Value)
+				u := unit.NewFromEtcd(unitName)
+				go u.LoadAndWatch()
+				units[unitName] = u
+			}
+			if ev.Type == mvccpb.DELETE {
+				unitName := string(ev.PrevKv.Value)
+				if unit, exists := units[unitName]; exists {
+					unit.Destroy()
+					delete(units, unitName)
+				}
 			}
 		}
 	}
@@ -121,13 +117,14 @@ func watchUnits() {
 func checkUnits() {
 	for {
 		time.Sleep(10 * time.Second)
-		result, err := etcdAPI.Get(ctx, machineLocation+"/units", &etcd.GetOptions{Recursive: true})
+		result, err := etcdAPI.Get(ctx, machineLocation+"/units", etcd.WithPrefix())
 		if err == nil {
-			for _, node := range result.Node.Nodes {
-				if _, ok := units[node.Value]; !ok {
-					u := unit.NewFromEtcd(node.Value)
+			for _, kv := range result.Kvs {
+				unitName := string(kv.Value)
+				if _, ok := units[unitName]; !ok {
+					u := unit.NewFromEtcd(unitName)
 					go u.LoadAndWatch()
-					units[node.Value] = u
+					units[unitName] = u
 				}
 			}
 		}
