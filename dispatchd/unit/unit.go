@@ -4,16 +4,17 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"time"
 
 	"strconv"
 
 	"github.com/spf13/afero"
 
 	"github.com/innovate-technologies/Dispatch/dispatchd/config"
+	"github.com/innovate-technologies/Dispatch/dispatchd/etcdclient"
 	"github.com/innovate-technologies/Dispatch/dispatchd/unit/state"
 
-	etcd "github.com/coreos/etcd/client"
+	etcd "github.com/coreos/etcd/clientv3"
+	"github.com/coreos/etcd/mvcc/mvccpb"
 	"github.com/coreos/go-systemd/dbus"
 	"golang.org/x/net/context"
 )
@@ -25,7 +26,7 @@ var (
 	Config *config.ConfigurationInfo
 	ctx    = context.Background()
 	//EtcdAPI is the etcd keys api
-	EtcdAPI etcd.KeysAPI
+	etcdAPI = etcdclient.GetEtcdv3()
 	// DBusConnection is the connection to the system's D-Bus
 	DBusConnection DBusConnectionInterface
 	// FS is the file system to be used
@@ -65,17 +66,20 @@ type Unit struct {
 
 // GetAll returns all units in our zone
 func GetAll() ([]Unit, error) {
-	setUpEtcd()
-	response, err := EtcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/units", Config.Zone), &etcd.GetOptions{})
+	response, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/units", Config.Zone), etcd.WithPrefix())
 	if err != nil {
 		return nil, err
 	}
 
 	units := []Unit{}
+	hadUnitNames := map[string]bool{}
 
-	for _, unitNode := range response.Node.Nodes {
-		pathParts := strings.Split(unitNode.Key, "/")
-		units = append(units, NewFromEtcd(pathParts[len(pathParts)-1]))
+	for _, kv := range response.Kvs {
+		pathParts := strings.Split(string(kv.Key), "/")
+		if _, ok := hadUnitNames[pathParts[4]]; !ok {
+			units = append(units, NewFromEtcd(pathParts[4]))
+		}
+
 	}
 
 	return units, nil
@@ -93,7 +97,6 @@ func NewFromEtcd(name string) Unit {
 		name += ".service"
 	}
 
-	setUpEtcd()
 	unit := New()
 	unit.etcdName = name
 	unit.onEtcd = true
@@ -207,7 +210,7 @@ func (unit *Unit) PutOnQueue() {
 	if unit.Global != "" {
 		return
 	}
-	EtcdAPI.Set(ctx, fmt.Sprintf("/dispatch/%s/queue/%s", Config.Zone, unit.Name), unit.Name, &etcd.SetOptions{})
+	etcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/queue/%s", Config.Zone, unit.Name), unit.Name)
 }
 
 func (unit *Unit) normalizeName() {
@@ -221,7 +224,6 @@ func (unit *Unit) SaveOnEtcd() {
 	unit.normalizeName()
 
 	log.Println("Saving", unit.Name, "to etcd")
-	setUpEtcd()
 
 	setKeyOnEtcd(unit.Name, "name", unit.Name)
 	setKeyOnEtcd(unit.Name, "unit", unit.UnitContent)
@@ -236,7 +238,7 @@ func (unit *Unit) SaveOnEtcd() {
 
 	if unit.Global != "" {
 		setKeyOnEtcd(unit.Name, "global", unit.Global)
-		EtcdAPI.Set(ctx, fmt.Sprintf("/dispatch/%s/globals/%s", Config.Zone, unit.Name), unit.Name, &etcd.SetOptions{})
+		etcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/globals/%s", Config.Zone, unit.Name), unit.Name)
 	}
 
 	unit.onEtcd = true
@@ -252,11 +254,11 @@ func (unit *Unit) Destroy() {
 	unit.onDisk = false
 	DBusConnection.Reload()
 
-	EtcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/%s/units/%s", Config.Zone, unit.Name), &etcd.DeleteOptions{Recursive: true})
-	EtcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/%s/queue/%s", Config.Zone, unit.Name), &etcd.DeleteOptions{Recursive: true})
-	EtcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/%s/machines/%s/units/%s", Config.Zone, Config.MachineName, unit.Name), &etcd.DeleteOptions{Recursive: true})
+	etcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/%s/units/%s", Config.Zone, unit.Name), etcd.WithPrefix())
+	etcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/%s/queue/%s", Config.Zone, unit.Name), etcd.WithPrefix())
+	etcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/%s/machines/%s/units/%s", Config.Zone, Config.MachineName, unit.Name), etcd.WithPrefix())
 	if unit.Global != "" {
-		EtcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/%s/globals/%s", Config.Zone, unit.Name), &etcd.DeleteOptions{})
+		etcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/%s/globals/%s", Config.Zone, unit.Name), etcd.WithPrefix())
 	}
 	unit.onEtcd = false
 }
@@ -283,52 +285,53 @@ func (unit *Unit) becomeDesiredState() {
 
 // Watch creates and etcd watcher for the desired state of a specific unit
 func (unit *Unit) Watch() {
-	w := EtcdAPI.Watcher(fmt.Sprintf("/dispatch/%s/units/%s/desiredState", Config.Zone, unit.Name), &etcd.WatcherOptions{})
-	for {
-		r, err := w.Next(ctx)
-		if err != nil {
-			go unit.Watch()
-			return
-		}
-		if r.Action == "set" {
-			unit.DesiredState = state.ForString(r.Node.Value)
-			unit.becomeDesiredState()
-		}
-		if r.Action == "delete" {
-			break
+	chans := etcdAPI.Watch(context.Background(), fmt.Sprintf("/dispatch/%s/units/%s/desiredState", Config.Zone, unit.Name), etcd.WithPrefix())
+	for resp := range chans {
+		for _, ev := range resp.Events {
+			if ev.IsModify() || ev.IsCreate() {
+				unit.DesiredState = state.ForString(string(ev.Kv.Value))
+				unit.becomeDesiredState()
+			}
+			if ev.Type == mvccpb.DELETE {
+				break
+			}
 		}
 	}
 }
 
 // WaitOnDestroy waits for the unit to enter a destroyed state
 func (unit *Unit) WaitOnDestroy() {
-	_, err := EtcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/units/%s", Config.Zone, unit.Name), &etcd.GetOptions{Recursive: true})
-	if err != nil { // Destroyed already
+	response, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/units/%s", Config.Zone, unit.Name), etcd.WithPrefix())
+	if err != nil || response.Count == 0 { // Destroyed already
 		return
 	}
-	w := EtcdAPI.Watcher(fmt.Sprintf("/dispatch/%s/units/%s/name", Config.Zone, unit.Name), &etcd.WatcherOptions{})
-	for {
-		r, err := w.Next(ctx)
-		if err != nil || r.Action == "delete" {
-			break
+
+	chans := etcdAPI.Watch(context.Background(), fmt.Sprintf("/dispatch/%s/units/%s/name", Config.Zone, unit.Name), etcd.WithPrefix())
+	for resp := range chans {
+		for _, ev := range resp.Events {
+			if ev.Type == mvccpb.DELETE {
+				break
+			}
 		}
 	}
 }
 
 // WaitOnState waits for the unit to enter a specific state
 func (unit *Unit) WaitOnState(s state.State) {
-	stateInfo, err := EtcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name), &etcd.GetOptions{})
-	if err != nil { // hmmm
+	stateInfo, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name))
+	if err != nil || stateInfo.Count == 0 { // hmmm
 		return
 	}
-	if stateInfo.Node.Value == s.String() {
+	if string(stateInfo.Kvs[0].Value) == s.String() {
 		return
 	}
-	w := EtcdAPI.Watcher(fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name), &etcd.WatcherOptions{})
-	for {
-		r, err := w.Next(ctx)
-		if (err != nil || r.Action == "set") && r.Node.Value == s.String() {
-			break
+
+	chans := etcdAPI.Watch(context.Background(), fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name), etcd.WithPrefix())
+	for resp := range chans {
+		for _, ev := range resp.Events {
+			if string(ev.Kv.Value) == s.String() {
+				break
+			}
 		}
 	}
 }
@@ -339,40 +342,25 @@ func (unit *Unit) SetState(s state.State) {
 		return
 	}
 	unit.State = s
-	EtcdAPI.Set(ctx, fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name), s.String(), &etcd.SetOptions{})
+	etcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name), s.String())
 }
 
 // SetDesiredState sets the desiredstate of the unit and updates etcd
 func (unit *Unit) SetDesiredState(s state.State) {
 	unit.DesiredState = s
-	EtcdAPI.Set(ctx, fmt.Sprintf("/dispatch/%s/units/%s/desiredState", Config.Zone, unit.Name), s.String(), &etcd.SetOptions{})
-}
-
-func setUpEtcd() {
-	if EtcdAPI != nil {
-		return
-	}
-	c, err := etcd.New(etcd.Config{
-		Endpoints:               []string{Config.EtcdAddress},
-		Transport:               etcd.DefaultTransport,
-		HeaderTimeoutPerRequest: 10 * time.Second,
-	})
-	if err != nil {
-		panic(err)
-	}
-	EtcdAPI = etcd.NewKeysAPI(c)
+	etcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/units/%s/desiredState", Config.Zone, unit.Name), s.String())
 }
 
 func getKeyFromEtcd(unit, key string) string {
-	response, err := EtcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit, key), &etcd.GetOptions{})
-	if err != nil {
+	response, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit, key))
+	if err != nil || response.Count == 0 {
 		return ""
 	}
-	return response.Node.Value
+	return string(response.Kvs[0].Value)
 }
 
 func setKeyOnEtcd(unit, key, content string) {
-	EtcdAPI.Set(ctx, fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit, key), content, &etcd.SetOptions{})
+	etcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit, key), content)
 }
 
 func setUpDBus() {
