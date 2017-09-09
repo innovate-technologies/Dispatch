@@ -20,7 +20,7 @@ func Start() {
 	if err != nil {
 		failCount++
 		if failCount < 15 {
-			time.Sleep(200 * time.Millisecond)
+			time.Sleep(600 * time.Millisecond)
 			Start()
 		} else {
 			log.Fatal(err)
