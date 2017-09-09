@@ -40,7 +40,7 @@ func Start() {
 
 // Stop stops the started embedded etcd server
 func Stop() {
-	e.Server.Stop()
+	e.Server.HardStop()
 	e.Close()
 	os.RemoveAll("default.etcd")
 }

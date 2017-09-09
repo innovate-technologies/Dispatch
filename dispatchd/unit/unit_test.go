@@ -129,7 +129,6 @@ func Test_start(t *testing.T) {
 }
 
 func Test_stop(t *testing.T) {
-
 	mockDBus, ctrl := setUpMockDBus(t)
 	defer ctrl.Finish()
 
@@ -173,6 +172,8 @@ func Test_restart(t *testing.T) {
 }
 
 func Test_create(t *testing.T) {
+	etcdserver.Start()
+	defer etcdserver.Stop()
 	mockDBus, ctrl := setUpMockDBus(t)
 	defer ctrl.Finish()
 	FS = afero.NewMemMapFs()
@@ -322,6 +323,8 @@ func Test_destroyGlobal(t *testing.T) {
 }
 
 func Test_killAllOldUnitsWithNone(t *testing.T) {
+	etcdserver.Start()
+	defer etcdserver.Stop()
 
 	mockDBus, ctrl := setUpMockDBus(t)
 	defer ctrl.Finish()
@@ -338,6 +341,8 @@ func Test_killAllOldUnitsWithNone(t *testing.T) {
 }
 
 func Test_killAllOldUnits(t *testing.T) {
+	etcdserver.Start()
+	defer etcdserver.Stop()
 
 	mockDBus, ctrl := setUpMockDBus(t)
 	defer ctrl.Finish()
