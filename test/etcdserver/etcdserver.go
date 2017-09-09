@@ -13,6 +13,12 @@ var failCount int
 
 // Start starts an embedded etcd server for testing
 func Start() {
+	done := make(chan bool)
+	go startGo(done)
+	<-done
+}
+
+func startGo(done chan bool) {
 	cfg := embed.NewConfig()
 	cfg.Dir = "default.etcd"
 	var err error
@@ -31,11 +37,12 @@ func Start() {
 	select {
 	case <-e.Server.ReadyNotify():
 		log.Printf("Server is ready!")
+		done <- true
 	case <-time.After(60 * time.Second):
 		e.Server.Stop() // trigger a shutdown
 		log.Printf("Server took too long to start!")
 	}
-	//log.Fatal(<-e.Err())
+	log.Fatal(<-e.Err())
 }
 
 // Stop stops the started embedded etcd server
