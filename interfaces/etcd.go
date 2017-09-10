@@ -1,6 +1,6 @@
 package interfaces
 
-import "context"
+import "golang.org/x/net/context" // mot there yet
 import "github.com/coreos/etcd/clientv3"
 
 // EtcdAPI is an interface for the etcd clientv3 api
