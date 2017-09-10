@@ -20,7 +20,7 @@ func setUpMockEtcd(t *testing.T) (*etcdMock.MockEtcdAPI, *gomock.Controller) {
 	ctrl := gomock.NewController(t)
 	mockAPI := etcdMock.NewMockEtcdAPI(ctrl)
 
-	etcdAPI = mockAPI
+	EtcdAPI = mockAPI
 
 	return mockAPI, ctrl
 }
