@@ -6,14 +6,24 @@ import (
 	"reflect"
 	"testing"
 
+	etcd "github.com/coreos/etcd/clientv3"
+	"github.com/coreos/etcd/mvcc/mvccpb"
 	"github.com/golang/mock/gomock"
 	"github.com/innovate-technologies/Dispatch/dispatchd/config"
 	"github.com/innovate-technologies/Dispatch/dispatchd/unit/state"
 	"github.com/innovate-technologies/Dispatch/mocks/dbusmock"
-	"github.com/innovate-technologies/Dispatch/test/etcdserver"
+	etcdMock "github.com/innovate-technologies/Dispatch/mocks/etcdmock"
 	"github.com/spf13/afero"
-	"github.com/stretchr/testify/assert"
 )
+
+func setUpMockEtcd(t *testing.T) (*etcdMock.MockEtcdAPI, *gomock.Controller) {
+	ctrl := gomock.NewController(t)
+	mockAPI := etcdMock.NewMockEtcdAPI(ctrl)
+
+	etcdAPI = mockAPI
+
+	return mockAPI, ctrl
+}
 
 func setUpMockDBus(t *testing.T) (*dbusmock.MockDBusConnectionInterface, *gomock.Controller) {
 	ctrl := gomock.NewController(t)
@@ -24,7 +34,7 @@ func setUpMockDBus(t *testing.T) (*dbusmock.MockDBusConnectionInterface, *gomock
 	return mockDBus, ctrl
 }
 
-func init() {
+func setUpConfig() {
 	Config = &config.ConfigurationInfo{Zone: "test", MachineName: "test-machine"}
 }
 
@@ -38,22 +48,6 @@ func getTestUnit() Unit {
 		DesiredState: state.Dead,
 		Ports:        []int64{80, 443},
 		UnitContent:  "TEST CONTENT",
-	}
-}
-
-func assertEtcd(t *testing.T, key, result string) {
-	res, _ := etcdAPI.Get(ctx, key)
-	if res.Count == 0 {
-		t.Fail()
-		return
-	}
-	assert.Equal(t, result, string(res.Kvs[0].Value))
-}
-
-func assertEmptyEtcd(t *testing.T, key string) {
-	res, _ := etcdAPI.Get(ctx, key)
-	if res.Count != 0 {
-		t.Fail()
 	}
 }
 
@@ -78,22 +72,21 @@ func Test_New(t *testing.T) {
 }
 
 func Test_newFromEtcd(t *testing.T) {
-	etcdserver.Start()
-	defer etcdserver.Stop()
-
-	_, ctrl := setUpMockDBus(t)
+	setUpConfig()
+	setUpMockDBus(t)
+	mockEtcd, ctrl := setUpMockEtcd(t)
 	defer ctrl.Finish()
 
 	unitName := "test-unit.service"
 
-	etcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unitName, "name"), unitName)
-	etcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unitName, "machine"), "test-machine")
-	etcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unitName, "global"), "")
-	etcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unitName, "unit"), "test content")
-	etcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unitName, "desiredState"), "active")
-	etcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unitName, "template"), "")
-	etcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unitName, "ports"), "80,443")
-	etcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unitName, "state"), "active")
+	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unitName, "name")).Return(&etcd.GetResponse{Count: 1, Kvs: []*mvccpb.KeyValue{{Value: []byte(unitName)}}}, nil)
+	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unitName, "machine")).Return(&etcd.GetResponse{Count: 1, Kvs: []*mvccpb.KeyValue{{Value: []byte("test-machine")}}}, nil)
+	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unitName, "global")).Return(&etcd.GetResponse{Count: 1, Kvs: []*mvccpb.KeyValue{{Value: []byte("")}}}, nil)
+	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unitName, "unit")).Return(&etcd.GetResponse{Count: 1, Kvs: []*mvccpb.KeyValue{{Value: []byte("test content")}}}, nil)
+	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unitName, "desiredState")).Return(&etcd.GetResponse{Count: 1, Kvs: []*mvccpb.KeyValue{{Value: []byte("active")}}}, nil)
+	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unitName, "template")).Return(&etcd.GetResponse{Count: 1, Kvs: []*mvccpb.KeyValue{{Value: []byte("")}}}, nil)
+	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unitName, "ports")).Return(&etcd.GetResponse{Count: 1, Kvs: []*mvccpb.KeyValue{{Value: []byte("80,443")}}}, nil)
+	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unitName, "state")).Return(&etcd.GetResponse{Count: 1, Kvs: []*mvccpb.KeyValue{{Value: []byte("active")}}}, nil)
 
 	want := Unit{
 		Name:         unitName,
@@ -114,66 +107,80 @@ func Test_newFromEtcd(t *testing.T) {
 }
 
 func Test_start(t *testing.T) {
-	etcdserver.Start()
-	defer etcdserver.Stop()
-
+	setUpConfig()
 	mockDBus, ctrl := setUpMockDBus(t)
+	mockEtcd, ctrl2 := setUpMockEtcd(t)
 	defer ctrl.Finish()
+	defer ctrl2.Finish()
 
 	unit := getTestUnit()
 
+	mockEtcd.EXPECT().Put(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name), "starting")
+
 	mockDBus.EXPECT().StartUnit(unit.Name, "fail", gomock.Any())
 
+	mockEtcd.EXPECT().Put(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name), "active")
+
 	unit.Start()
-	assertEtcd(t, fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name), "active")
 }
 
 func Test_stop(t *testing.T) {
+	setUpConfig()
 	mockDBus, ctrl := setUpMockDBus(t)
+	mockEtcd, ctrl2 := setUpMockEtcd(t)
 	defer ctrl.Finish()
+	defer ctrl2.Finish()
 
 	unit := getTestUnit()
 
 	mockDBus.EXPECT().StopUnit(unit.Name, "fail", gomock.Any())
 
+	mockEtcd.EXPECT().Put(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name), "dead")
+
 	unit.Stop()
-	assertEtcd(t, fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name), "dead")
 }
 
 func Test_stopError(t *testing.T) {
-	etcdserver.Start()
-	defer etcdserver.Stop()
-
+	setUpConfig()
 	mockDBus, ctrl := setUpMockDBus(t)
+	mockEtcd, ctrl2 := setUpMockEtcd(t)
 	defer ctrl.Finish()
+	defer ctrl2.Finish()
 
 	unit := getTestUnit()
 
 	mockDBus.EXPECT().StopUnit(unit.Name, "fail", gomock.Any()).Return(0, fmt.Errorf("test"))
 	mockDBus.EXPECT().KillUnit(gomock.Any(), gomock.Any())
 
+	mockEtcd.EXPECT().Put(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name), "dead")
+
 	unit.Stop()
-	assertEtcd(t, fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name), "dead")
 }
 
 func Test_restart(t *testing.T) {
-	etcdserver.Start()
-	defer etcdserver.Stop()
-
+	setUpConfig()
 	mockDBus, ctrl := setUpMockDBus(t)
+	mockEtcd, ctrl2 := setUpMockEtcd(t)
 	defer ctrl.Finish()
+	defer ctrl2.Finish()
 
 	unit := getTestUnit()
 
 	mockDBus.EXPECT().StopUnit(unit.Name, "fail", gomock.Any())
 
+	mockEtcd.EXPECT().Put(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name), "dead")
+
+	mockEtcd.EXPECT().Put(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name), "starting")
+
+	mockDBus.EXPECT().StartUnit(unit.Name, "fail", gomock.Any())
+
+	mockEtcd.EXPECT().Put(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name), "active")
+
 	unit.Restart()
-	assertEtcd(t, fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name), "active")
 }
 
 func Test_create(t *testing.T) {
-	etcdserver.Start()
-	defer etcdserver.Stop()
+	setUpConfig()
 	mockDBus, ctrl := setUpMockDBus(t)
 	defer ctrl.Finish()
 	FS = afero.NewMemMapFs()
@@ -196,70 +203,74 @@ func Test_create(t *testing.T) {
 }
 
 func Test_putOnQueue(t *testing.T) {
-	etcdserver.Start()
-	defer etcdserver.Stop()
+	setUpConfig()
+	mockEtcd, ctrl := setUpMockEtcd(t)
+	defer ctrl.Finish()
 
 	unit := getTestUnit()
+
+	mockEtcd.EXPECT().Put(gomock.Any(), fmt.Sprintf("/dispatch/%s/queue/%s", Config.Zone, unit.Name), unit.Name)
+
 	unit.PutOnQueue()
-	assertEtcd(t, fmt.Sprintf("/dispatch/%s/queue/%s", Config.Zone, unit.Name), unit.Name)
 }
 
 func Test_putOnQueueGlobal(t *testing.T) {
-	etcdserver.Start()
-	defer etcdserver.Stop()
-
+	setUpConfig()
 	unit := getTestUnit()
 	unit.Global = unit.Name
 
 	unit.PutOnQueue()
-	kv, _ := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/queue/%s", Config.Zone, unit.Name))
-	assert.Equal(t, int64(0), kv.Count)
 }
 
 func Test_saveOnEtcd(t *testing.T) {
-	etcdserver.Start()
-	defer etcdserver.Stop()
+	setUpConfig()
+	mockEtcd, ctrl := setUpMockEtcd(t)
+	defer ctrl.Finish()
 
 	unit := getTestUnit()
+
+	mockEtcd.EXPECT().Put(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, "name"), unit.Name)
+	mockEtcd.EXPECT().Put(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, "unit"), unit.UnitContent)
+	mockEtcd.EXPECT().Put(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, "template"), unit.Template)
+	mockEtcd.EXPECT().Put(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, "desiredState"), "dead")
+	mockEtcd.EXPECT().Put(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, "ports"), "80,443")
+
 	unit.SaveOnEtcd()
 
 	if !unit.onEtcd {
 		t.Errorf("Unit is not set as on etcd")
 	}
-	assertEtcd(t, fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, "name"), unit.Name)
-	assertEtcd(t, fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, "unit"), unit.UnitContent)
-	assertEtcd(t, fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, "template"), unit.Template)
-	assertEtcd(t, fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, "desiredState"), "dead")
-	assertEtcd(t, fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, "ports"), "80,443")
 }
 
 func Test_saveOnEtcdWithGlobal(t *testing.T) {
-	etcdserver.Start()
-	defer etcdserver.Stop()
+	setUpConfig()
+	mockEtcd, ctrl := setUpMockEtcd(t)
+	defer ctrl.Finish()
 
 	unit := getTestUnit()
 	unit.Global = unit.Name
+
+	mockEtcd.EXPECT().Put(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, "name"), unit.Name)
+	mockEtcd.EXPECT().Put(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, "unit"), unit.UnitContent)
+	mockEtcd.EXPECT().Put(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, "template"), unit.Template)
+	mockEtcd.EXPECT().Put(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, "desiredState"), "dead")
+	mockEtcd.EXPECT().Put(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, "ports"), "80,443")
+	mockEtcd.EXPECT().Put(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, "global"), unit.Global)
+	mockEtcd.EXPECT().Put(gomock.Any(), fmt.Sprintf("/dispatch/%s/globals/%s", Config.Zone, unit.Name), unit.Name)
 
 	unit.SaveOnEtcd()
 
 	if !unit.onEtcd {
 		t.Errorf("Unit is not set as on etcd")
 	}
-	assertEtcd(t, fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, "name"), unit.Name)
-	assertEtcd(t, fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, "unit"), unit.UnitContent)
-	assertEtcd(t, fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, "template"), unit.Template)
-	assertEtcd(t, fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, "desiredState"), "dead")
-	assertEtcd(t, fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, "ports"), "80,443")
-	assertEtcd(t, fmt.Sprintf("/dispatch/%s/globals/%s", Config.Zone, unit.Name), unit.Name)
 }
 
 func Test_destroy(t *testing.T) {
-	etcdserver.Start()
-	defer etcdserver.Stop()
-
-	mockDBus, ctrl := setUpMockDBus(t)
+	setUpConfig()
+	mockEtcd, ctrl := setUpMockEtcd(t)
+	mockDBus, ctrl2 := setUpMockDBus(t)
 	defer ctrl.Finish()
-
+	defer ctrl2.Finish()
 	FS = afero.NewMemMapFs()
 
 	unit := getTestUnit()
@@ -269,9 +280,11 @@ func Test_destroy(t *testing.T) {
 	mockDBus.EXPECT().StopUnit(unit.Name, "fail", gomock.Any())
 	mockDBus.EXPECT().Reload()
 
-	etcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/queue/%s", Config.Zone, unit.Name), "test")
-	etcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/units/%s/name", Config.Zone, unit.Name), "test")
-	etcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/machines/%s/units/%s", Config.Zone, Config.MachineName, unit.Name), "test")
+	mockEtcd.EXPECT().Put(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name), "dead")
+
+	mockEtcd.EXPECT().Delete(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s", Config.Zone, unit.Name), gomock.Any())
+	mockEtcd.EXPECT().Delete(gomock.Any(), fmt.Sprintf("/dispatch/%s/queue/%s", Config.Zone, unit.Name), gomock.Any())
+	mockEtcd.EXPECT().Delete(gomock.Any(), fmt.Sprintf("/dispatch/%s/machines/%s/units/%s", Config.Zone, Config.MachineName, unit.Name), gomock.Any())
 
 	unit.Destroy()
 
@@ -281,17 +294,14 @@ func Test_destroy(t *testing.T) {
 	if unit.onEtcd {
 		t.Errorf("Unit is not unset as on etcd")
 	}
-	assertEmptyEtcd(t, fmt.Sprintf("/dispatch/%s/queue/%s", Config.Zone, unit.Name))
-	assertEmptyEtcd(t, fmt.Sprintf("/dispatch/%s/units/%s/name", Config.Zone, unit.Name))
-	assertEmptyEtcd(t, fmt.Sprintf("/dispatch/%s/machines/%s/units/%s", Config.Zone, Config.MachineName, unit.Name))
 }
 
 func Test_destroyGlobal(t *testing.T) {
-	etcdserver.Start()
-	defer etcdserver.Stop()
-
-	mockDBus, ctrl := setUpMockDBus(t)
+	setUpConfig()
+	mockEtcd, ctrl := setUpMockEtcd(t)
+	mockDBus, ctrl2 := setUpMockDBus(t)
 	defer ctrl.Finish()
+	defer ctrl2.Finish()
 	FS = afero.NewMemMapFs()
 
 	unit := getTestUnit()
@@ -302,10 +312,10 @@ func Test_destroyGlobal(t *testing.T) {
 	mockDBus.EXPECT().StopUnit(unit.Name, "fail", gomock.Any())
 	mockDBus.EXPECT().Reload()
 
-	etcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/queue/%s", Config.Zone, unit.Name), "test")
-	etcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/units/%s/name", Config.Zone, unit.Name), "test")
-	etcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/machines/%s/units/%s", Config.Zone, Config.MachineName, unit.Name), "test")
-	etcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/globals/%s", Config.Zone, unit.Name), "test")
+	mockEtcd.EXPECT().Delete(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s", Config.Zone, unit.Name), gomock.Any())
+	mockEtcd.EXPECT().Delete(gomock.Any(), fmt.Sprintf("/dispatch/%s/queue/%s", Config.Zone, unit.Name), gomock.Any())
+	mockEtcd.EXPECT().Delete(gomock.Any(), fmt.Sprintf("/dispatch/%s/machines/%s/units/%s", Config.Zone, Config.MachineName, unit.Name), gomock.Any())
+	mockEtcd.EXPECT().Delete(gomock.Any(), fmt.Sprintf("/dispatch/%s/globals/%s", Config.Zone, unit.Name), gomock.Any())
 
 	unit.Destroy()
 
@@ -315,17 +325,10 @@ func Test_destroyGlobal(t *testing.T) {
 	if unit.onEtcd {
 		t.Errorf("Unit is not unset as on etcd")
 	}
-
-	assertEmptyEtcd(t, fmt.Sprintf("/dispatch/%s/queue/%s", Config.Zone, unit.Name))
-	assertEmptyEtcd(t, fmt.Sprintf("/dispatch/%s/units/%s/name", Config.Zone, unit.Name))
-	assertEmptyEtcd(t, fmt.Sprintf("/dispatch/%s/machines/%s/units/%s", Config.Zone, Config.MachineName, unit.Name))
-	assertEmptyEtcd(t, fmt.Sprintf("/dispatch/%s/globals/%s", Config.Zone, unit.Name))
 }
 
 func Test_killAllOldUnitsWithNone(t *testing.T) {
-	etcdserver.Start()
-	defer etcdserver.Stop()
-
+	setUpConfig()
 	mockDBus, ctrl := setUpMockDBus(t)
 	defer ctrl.Finish()
 	FS = afero.NewMemMapFs()
@@ -341,9 +344,7 @@ func Test_killAllOldUnitsWithNone(t *testing.T) {
 }
 
 func Test_killAllOldUnits(t *testing.T) {
-	etcdserver.Start()
-	defer etcdserver.Stop()
-
+	setUpConfig()
 	mockDBus, ctrl := setUpMockDBus(t)
 	defer ctrl.Finish()
 

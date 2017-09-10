@@ -12,6 +12,7 @@ import (
 	"github.com/innovate-technologies/Dispatch/dispatchd/config"
 	"github.com/innovate-technologies/Dispatch/dispatchd/etcdclient"
 	"github.com/innovate-technologies/Dispatch/dispatchd/unit/state"
+	"github.com/innovate-technologies/Dispatch/interfaces"
 
 	etcd "github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/mvcc/mvccpb"
@@ -26,7 +27,7 @@ var (
 	Config *config.ConfigurationInfo
 	ctx    = context.Background()
 	//EtcdAPI is the etcd keys api
-	etcdAPI = etcdclient.GetEtcdv3()
+	etcdAPI interfaces.EtcdAPI = etcdclient.GetEtcdv3()
 	// DBusConnection is the connection to the system's D-Bus
 	DBusConnection DBusConnectionInterface
 	// FS is the file system to be used
