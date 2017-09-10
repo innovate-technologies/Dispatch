@@ -5,15 +5,15 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"text/template"
 
 	"github.com/innovate-technologies/Dispatch/dispatchd/config"
+	"github.com/innovate-technologies/Dispatch/dispatchd/etcdclient"
 	"github.com/innovate-technologies/Dispatch/dispatchd/unit"
 	"github.com/innovate-technologies/Dispatch/dispatchd/unit/state"
 
-	etcd "github.com/coreos/etcd/client"
+	etcd "github.com/coreos/etcd/clientv3"
 	"golang.org/x/net/context"
 )
 
@@ -30,8 +30,8 @@ type Template struct {
 var (
 	// Config is a pointer need to be set to the main configuration
 	Config  *config.ConfigurationInfo
-	ctx     = context.Background()
-	etcdAPI etcd.KeysAPI
+	ctx             = context.Background()
+	etcdAPI etcd.KV = etcdclient.GetEtcdv3()
 )
 
 // New returns a new blank Template
@@ -41,17 +41,20 @@ func New() Template {
 
 // GetAll returns all templates in our zone
 func GetAll() ([]Template, error) {
-	setUpEtcd()
-	response, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/templates", Config.Zone), &etcd.GetOptions{})
+	response, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/templates", Config.Zone), etcd.WithPrefix())
 	if err != nil {
 		return nil, err
 	}
 
 	templates := []Template{}
+	hadTemplateNames := map[string]bool{}
 
-	for _, unitNode := range response.Node.Nodes {
-		pathParts := strings.Split(unitNode.Key, "/")
-		templates = append(templates, NewFromEtcd(pathParts[len(pathParts)-1]))
+	for _, kv := range response.Kvs {
+		pathParts := strings.Split(string(kv.Key), "/")
+		if _, ok := hadTemplateNames[pathParts[4]]; !ok {
+			templates = append(templates, NewFromEtcd(pathParts[4]))
+		}
+
 	}
 
 	return templates, nil
@@ -59,7 +62,6 @@ func GetAll() ([]Template, error) {
 
 // NewFromEtcd creates a new Template with info from etcd
 func NewFromEtcd(name string) Template {
-	setUpEtcd()
 	template := New()
 	template.onEtcd = true
 	template.Name = getKeyFromEtcd(name, "name")
@@ -80,7 +82,6 @@ func NewFromEtcd(name string) Template {
 
 // SaveOnEtcd saves the unit to etcd
 func (t *Template) SaveOnEtcd() {
-	setUpEtcd()
 	setKeyOnEtcd(t.Name, "name", t.Name)
 	setKeyOnEtcd(t.Name, "unit", t.UnitContent)
 	setKeyOnEtcd(t.Name, "maxpermachine", strconv.FormatInt(t.MaxPerMachine, 10))
@@ -96,8 +97,7 @@ func (t *Template) SaveOnEtcd() {
 
 // Delete removes the template from etcd
 func (t *Template) Delete() {
-	setUpEtcd()
-	etcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/%s/templates/%s", Config.Zone, t.Name), &etcd.DeleteOptions{Recursive: true})
+	etcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/%s/templates/%s", Config.Zone, t.Name), etcd.WithPrefix())
 }
 
 // NewUnit gives back a new Unit from the template
@@ -119,30 +119,14 @@ func (t *Template) NewUnit(name string, vars map[string]string) unit.Unit {
 	return u
 }
 
-func setUpEtcd() {
-	if etcdAPI != nil {
-		return
-	}
-	c, err := etcd.New(etcd.Config{
-		Endpoints:               []string{Config.EtcdAddress},
-		Transport:               etcd.DefaultTransport,
-		HeaderTimeoutPerRequest: 10 * time.Second,
-	})
-	if err != nil {
-		panic(err)
-	}
-	etcdAPI = etcd.NewKeysAPI(c)
-}
-
 func getKeyFromEtcd(unit, key string) string {
-	response, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/templates/%s/%s", Config.Zone, unit, key), &etcd.GetOptions{})
-	if err != nil {
+	response, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/templates/%s/%s", Config.Zone, unit, key))
+	if err != nil || response.Count == 0 {
 		return ""
 	}
-	return response.Node.Value
+	return string(response.Kvs[0].Value)
 }
 
-func setKeyOnEtcd(template, key, content string) {
-	fmt.Println(template, key, content)
-	etcdAPI.Set(ctx, fmt.Sprintf("/dispatch/%s/templates/%s/%s", Config.Zone, template, key), content, &etcd.SetOptions{})
+func setKeyOnEtcd(unit, key, content string) {
+	etcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/templates/%s/%s", Config.Zone, unit, key), content)
 }

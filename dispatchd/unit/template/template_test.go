@@ -5,7 +5,8 @@ import (
 	"reflect"
 	"testing"
 
-	etcd "github.com/coreos/etcd/client"
+	etcd "github.com/coreos/etcd/clientv3"
+	"github.com/coreos/etcd/mvcc/mvccpb"
 	"github.com/golang/mock/gomock"
 	"github.com/innovate-technologies/Dispatch/dispatchd/config"
 	"github.com/innovate-technologies/Dispatch/dispatchd/unit"
@@ -14,17 +15,17 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func setUpMockEtcd(t *testing.T) (*etcdMock.MockKeysAPI, *gomock.Controller) {
+func init() {
+	Config = &config.ConfigurationInfo{Zone: "test", MachineName: "test-machine"}
+}
+
+func setUpMockEtcd(t *testing.T) (*etcdMock.MockEtcdAPI, *gomock.Controller) {
 	ctrl := gomock.NewController(t)
-	mockAPI := etcdMock.NewMockKeysAPI(ctrl)
+	mockAPI := etcdMock.NewMockEtcdAPI(ctrl)
 
 	etcdAPI = mockAPI
 
 	return mockAPI, ctrl
-}
-
-func setUpConfig() {
-	Config = &config.ConfigurationInfo{Zone: "test", MachineName: "test-machine"}
 }
 
 func getTestTemplate() Template {
@@ -70,34 +71,31 @@ func TestNew(t *testing.T) {
 }
 
 func Test_saveOnEtcd(t *testing.T) {
-	setUpConfig()
 	mockEtcd, ctrl := setUpMockEtcd(t)
 	defer ctrl.Finish()
 
 	template := getTestTemplate()
 
-	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/%s/templates/%s/%s", Config.Zone, template.Name, "name"), template.Name, gomock.Any())
-	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/%s/templates/%s/%s", Config.Zone, template.Name, "unit"), template.UnitContent, gomock.Any())
-	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/%s/templates/%s/%s", Config.Zone, template.Name, "maxpermachine"), "5", gomock.Any())
-	mockEtcd.EXPECT().Set(gomock.Any(), fmt.Sprintf("/dispatch/%s/templates/%s/%s", Config.Zone, template.Name, "ports"), "80,443", gomock.Any())
+	mockEtcd.EXPECT().Put(gomock.Any(), fmt.Sprintf("/dispatch/%s/templates/%s/%s", Config.Zone, template.Name, "name"), template.Name)
+	mockEtcd.EXPECT().Put(gomock.Any(), fmt.Sprintf("/dispatch/%s/templates/%s/%s", Config.Zone, template.Name, "unit"), template.UnitContent)
+	mockEtcd.EXPECT().Put(gomock.Any(), fmt.Sprintf("/dispatch/%s/templates/%s/%s", Config.Zone, template.Name, "maxpermachine"), "5")
+	mockEtcd.EXPECT().Put(gomock.Any(), fmt.Sprintf("/dispatch/%s/templates/%s/%s", Config.Zone, template.Name, "ports"), "80,443")
 
 	template.SaveOnEtcd()
 }
 
 func Test_deleteFromEtcd(t *testing.T) {
-	setUpConfig()
 	mockEtcd, ctrl := setUpMockEtcd(t)
 	defer ctrl.Finish()
 
 	template := getTestTemplate()
 
-	mockEtcd.EXPECT().Delete(gomock.Any(), fmt.Sprintf("/dispatch/%s/templates/%s", Config.Zone, template.Name), &etcd.DeleteOptions{Recursive: true})
+	mockEtcd.EXPECT().Delete(gomock.Any(), fmt.Sprintf("/dispatch/%s/templates/%s", Config.Zone, template.Name), gomock.Any())
 
 	template.Delete()
 }
 
 func Test_newUnit(t *testing.T) {
-	setUpConfig()
 	mockEtcd, ctrl := setUpMockEtcd(t)
 	mockDBus := dbusmock.NewMockDBusConnectionInterface(gomock.NewController(t))
 	defer ctrl.Finish()
@@ -114,16 +112,15 @@ func Test_newUnit(t *testing.T) {
 }
 
 func Test_newFromEtcd(t *testing.T) {
-	setUpConfig()
 	mockEtcd, ctrl := setUpMockEtcd(t)
 	defer ctrl.Finish()
 
 	templateName := "test-temp"
 
-	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/%s/templates/%s/%s", Config.Zone, templateName, "name"), gomock.Any()).Return(&etcd.Response{Node: &etcd.Node{Value: "test-temp"}}, nil)
-	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/%s/templates/%s/%s", Config.Zone, templateName, "unit"), gomock.Any()).Return(&etcd.Response{Node: &etcd.Node{Value: "test content"}}, nil)
-	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/%s/templates/%s/%s", Config.Zone, templateName, "maxpermachine"), gomock.Any()).Return(&etcd.Response{Node: &etcd.Node{Value: "10"}}, nil)
-	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/%s/templates/%s/%s", Config.Zone, templateName, "ports"), gomock.Any()).Return(&etcd.Response{Node: &etcd.Node{Value: "80,443"}}, nil)
+	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/%s/templates/%s/%s", Config.Zone, templateName, "name")).Return(&etcd.GetResponse{Count: 1, Kvs: []*mvccpb.KeyValue{{Value: []byte("test-temp")}}}, nil)
+	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/%s/templates/%s/%s", Config.Zone, templateName, "unit")).Return(&etcd.GetResponse{Count: 1, Kvs: []*mvccpb.KeyValue{{Value: []byte("test content")}}}, nil)
+	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/%s/templates/%s/%s", Config.Zone, templateName, "maxpermachine")).Return(&etcd.GetResponse{Count: 1, Kvs: []*mvccpb.KeyValue{{Value: []byte("10")}}}, nil)
+	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/%s/templates/%s/%s", Config.Zone, templateName, "ports")).Return(&etcd.GetResponse{Count: 1, Kvs: []*mvccpb.KeyValue{{Value: []byte("80,443")}}}, nil)
 
 	template := NewFromEtcd(templateName)
 
