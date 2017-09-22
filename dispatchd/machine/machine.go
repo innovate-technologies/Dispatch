@@ -81,7 +81,7 @@ func setTags(tags map[string]string) {
 }
 
 func startUnits() {
-	result, err := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/machines/%s/units", Config.Zone, Config.MachineName))
+	result, err := etcdAPI.Get(ctx, machineLocation+"/units")
 	if err == nil {
 		for _, kv := range result.Kvs {
 			unitName := string(kv.Value)
@@ -94,20 +94,22 @@ func startUnits() {
 }
 
 func watchUnits() {
-	chans := etcdAPI.Watch(context.Background(), fmt.Sprintf("/dispatch/%s/queue", Config.Zone), etcd.WithPrefix())
+	chans := etcdAPI.Watch(context.Background(), machineLocation+"/units", etcd.WithPrefix())
 	for resp := range chans {
 		for _, ev := range resp.Events {
-			if ev.IsCreate() {
+			if ev.IsCreate() || ev.IsModify() {
 				unitName := string(ev.Kv.Value)
+				fmt.Println("Found new unit", unitName)
 				u := unit.NewFromEtcd(unitName)
 				go u.LoadAndWatch()
 				units[unitName] = u
 			}
 			if ev.Type == mvccpb.DELETE {
 				unitName := string(ev.PrevKv.Value)
+				fmt.Println("Delete unit", unitName)
 				if unit, exists := units[unitName]; exists {
-					unit.Destroy()
 					delete(units, unitName)
+					unit.Destroy()
 				}
 			}
 		}
@@ -122,6 +124,7 @@ func checkUnits() {
 			for _, kv := range result.Kvs {
 				unitName := string(kv.Value)
 				if _, ok := units[unitName]; !ok {
+					fmt.Println("Found new unit via check", unitName)
 					u := unit.NewFromEtcd(unitName)
 					go u.LoadAndWatch()
 					units[unitName] = u

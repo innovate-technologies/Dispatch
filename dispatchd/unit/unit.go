@@ -208,10 +208,10 @@ func (unit *Unit) Create() {
 
 // PutOnQueue places a specific unit on the queue
 func (unit *Unit) PutOnQueue() {
-	log.Println("Placing", unit.Name, "on queue")
 	if unit.Global != "" {
 		return
 	}
+	log.Println("Placing", unit.Name, "on queue")
 	EtcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/queue/%s", Config.Zone, unit.Name), unit.Name)
 }
 
@@ -267,9 +267,7 @@ func (unit *Unit) Destroy() {
 
 // LoadAndWatch loads the unit to the system and follows the desired state
 func (unit *Unit) LoadAndWatch() {
-	if !unit.onDisk {
-		unit.Create()
-	}
+	unit.Create()
 	unit.becomeDesiredState()
 	go unit.Watch()
 }

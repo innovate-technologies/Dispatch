@@ -13,7 +13,7 @@ func watchGlobals() {
 	chans := etcdAPI.Watch(context.Background(), fmt.Sprintf("/dispatch/%s/globals", Config.Zone), etcd.WithPrefix())
 	for resp := range chans {
 		for _, ev := range resp.Events {
-			if ev.IsCreate() {
+			if ev.IsCreate() || ev.IsModify() {
 				assignToAllMachines(string(ev.Kv.Value))
 			}
 			if ev.Type == mvccpb.DELETE {
