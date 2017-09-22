@@ -57,9 +57,9 @@ func deleteUnit(c echo.Context) error {
 		go u.Destroy()
 	} else {
 		go u.SetDesiredState(state.Destroy)
+		u.WaitOnDestroy()
 	}
 
-	u.WaitOnDestroy()
 	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }
 
