@@ -1,0 +1,17 @@
+version: '2'
+services:
+  node1:
+    build: ./node
+    links:
+      - etcd
+    privileged: true
+  node2:
+    build: ./node
+    links:
+      - etcd
+    privileged: true
+  etcd:
+    image: maartje/etcd-multiarch:amd64-v3.2.6
+    environment:
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379

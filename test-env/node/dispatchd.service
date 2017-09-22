@@ -1,0 +1,12 @@
+[Unit]
+Description=Dispatchd
+
+[Service]
+# TO DO: change this in the future
+Environment = DISPATCH_ETCDADDRESS=http://etcd:2379
+ExecStart = /usr/bin/dispatchd  
+Restart=always
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target
