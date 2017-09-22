@@ -11,7 +11,7 @@ services:
       - etcd
     privileged: true
   etcd:
-    image: maartje/etcd-multiarch:amd64-v3.2.6
+    image: maartje/etcd-multiarch:amd64-v3.2.7
     environment:
       - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
       - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
