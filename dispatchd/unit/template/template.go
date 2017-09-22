@@ -53,6 +53,7 @@ func GetAll() ([]Template, error) {
 		pathParts := strings.Split(string(kv.Key), "/")
 		if _, ok := hadTemplateNames[pathParts[4]]; !ok {
 			templates = append(templates, NewFromEtcd(pathParts[4]))
+			hadTemplateNames[pathParts[4]] = true
 		}
 
 	}

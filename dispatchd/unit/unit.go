@@ -79,6 +79,7 @@ func GetAll() ([]Unit, error) {
 		pathParts := strings.Split(string(kv.Key), "/")
 		if _, ok := hadUnitNames[pathParts[4]]; !ok {
 			units = append(units, NewFromEtcd(pathParts[4]))
+			hadUnitNames[pathParts[4]] = true
 		}
 
 	}

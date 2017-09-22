@@ -153,6 +153,7 @@ func checkForDeadMachines() {
 				fmt.Println(key, "dead at arrival")
 				foundDeadMachine(key)
 			}
+			serversHad[machine] = true
 		}
 	}
 }
