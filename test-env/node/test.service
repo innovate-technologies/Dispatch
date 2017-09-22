@@ -3,7 +3,7 @@ Description=Dispatchd
 
 [Service]
 ExecStart = /bin/bash -c 'docker run --rm --name nginx -p 80:80 nginx'
-ExecStopt = /bin/bash -c 'docker kill nginx'
+ExecStop = /bin/bash -c 'docker kill nginx'
 Restart=always
 RestartSec=10s
 
