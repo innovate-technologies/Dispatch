@@ -6,4 +6,4 @@ go build ../../dispatchd
 go build ../../dispatchctl
 
 cd ..
-docker-compose up --build
+sudo docker-compose up --build
