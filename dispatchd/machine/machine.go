@@ -105,11 +105,13 @@ func watchUnits() {
 				units[unitName] = u
 			}
 			if ev.Type == mvccpb.DELETE {
-				unitName := string(ev.PrevKv.Value)
-				fmt.Println("Delete unit", unitName)
-				if unit, exists := units[unitName]; exists {
-					delete(units, unitName)
-					unit.Destroy()
+				if ev.PrevKv != nil {
+					unitName := string(ev.PrevKv.Value)
+					fmt.Println("Delete unit", unitName)
+					if unit, exists := units[unitName]; exists {
+						delete(units, unitName)
+						unit.Destroy()
+					}
 				}
 			}
 		}
@@ -121,13 +123,25 @@ func checkUnits() {
 		time.Sleep(10 * time.Second)
 		result, err := etcdAPI.Get(ctx, machineLocation+"/units", etcd.WithPrefix())
 		if err == nil {
+			unitsOnCluster := map[string]bool{}
+
 			for _, kv := range result.Kvs {
 				unitName := string(kv.Value)
+				unitsOnCluster[unitName] = true
 				if _, ok := units[unitName]; !ok {
 					fmt.Println("Found new unit via check", unitName)
 					u := unit.NewFromEtcd(unitName)
 					go u.LoadAndWatch()
 					units[unitName] = u
+				}
+			}
+
+			// Check if not running too much
+			for unitName, unit := range units {
+				if _, ok := unitsOnCluster[unitName]; unit.Global == "" && !ok {
+					fmt.Println("Found non deleted unit via check", unitName)
+					delete(units, unitName)
+					unit.Destroy()
 				}
 			}
 		}
