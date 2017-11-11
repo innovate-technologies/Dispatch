@@ -90,5 +90,8 @@ func postUnitFromTemplate(c echo.Context) error {
 		u.Ports = info.Ports
 	}
 
+	u.SaveOnEtcd()
+	u.PutOnQueue()
+
 	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }
