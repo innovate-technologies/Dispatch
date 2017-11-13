@@ -256,6 +256,12 @@ func (unit *Unit) Destroy() {
 	unit.onDisk = false
 	DBusConnection.Reload()
 
+	if unit.Name == "" {
+		// oopsie
+		unit.onEtcd = false //probably not
+		return
+	}
+
 	EtcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/%s/units/%s", Config.Zone, unit.Name), etcd.WithPrefix())
 	EtcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/%s/queue/%s", Config.Zone, unit.Name), etcd.WithPrefix())
 	EtcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/%s/machines/%s/units/%s", Config.Zone, Config.MachineName, unit.Name), etcd.WithPrefix())
