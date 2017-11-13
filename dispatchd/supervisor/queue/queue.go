@@ -21,8 +21,9 @@ var (
 	ctx     = context.Background()
 	etcdAPI = etcdclient.GetEtcdv3()
 	// Config is a pointer need to be set to the main configuration
-	Config     *config.ConfigurationInfo
-	queueMutex = &sync.Mutex{}
+	Config      *config.ConfigurationInfo
+	queueMutex  = &sync.Mutex{}
+	assignMutex = &sync.Mutex{}
 )
 
 // Run checks for waiting units and assigns them
@@ -71,12 +72,14 @@ func watchQueue() {
 }
 
 func assignUnit(name string) {
+	assignMutex.Lock()
 	fmt.Println(name)
 	newUnit := unit.NewFromEtcd(name)
 	machine := getMachineForUnitConstraints(newUnit)
 	if machine != "" {
 		assignUnitToMachine(name, machine)
 	}
+	assignMutex.Unlock()
 }
 
 type machineInfoContent struct {
