@@ -14,14 +14,14 @@ var etcdAPI = etcdclient.GetEtcdv3()
 
 // EtcdCache stores etcd records in memory to do requests on
 type EtcdCache struct {
-	cache      map[string][]byte
+	cache      map[string]*mvccpb.KeyValue
 	cacheMutex sync.Mutex
 }
 
 // New gives a new empty EtcdCache
 func New() *EtcdCache {
 	return &EtcdCache{
-		cache:      map[string][]byte{},
+		cache:      map[string]*mvccpb.KeyValue{},
 		cacheMutex: sync.Mutex{},
 	}
 }
@@ -41,7 +41,7 @@ func NewForPrefix(prefix string) (*EtcdCache, error) {
 }
 
 // Get gets a key out of the cache
-func (e *EtcdCache) Get(key string) ([]byte, error) {
+func (e *EtcdCache) Get(key string) (*mvccpb.KeyValue, error) {
 	e.cacheMutex.Lock()
 	defer e.cacheMutex.Unlock()
 	if val, ok := e.cache[key]; ok {
@@ -53,6 +53,6 @@ func (e *EtcdCache) Get(key string) ([]byte, error) {
 // Put allows to add a new record
 func (e *EtcdCache) Put(val *mvccpb.KeyValue) {
 	e.cacheMutex.Lock()
-	e.cache[string(val.Key)] = val.Value
+	e.cache[string(val.Key)] = val
 	e.cacheMutex.Unlock()
 }
