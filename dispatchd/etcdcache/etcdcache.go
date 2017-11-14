@@ -56,3 +56,14 @@ func (e *EtcdCache) Put(val *mvccpb.KeyValue) {
 	e.cache[string(val.Key)] = val
 	e.cacheMutex.Unlock()
 }
+
+// GetAll returns all cached keys
+func (e *EtcdCache) GetAll() []*mvccpb.KeyValue {
+	out := []*mvccpb.KeyValue{}
+
+	for _, val := range e.cache {
+		out = append(out, val)
+	}
+
+	return out
+}
