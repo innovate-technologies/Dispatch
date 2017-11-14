@@ -57,7 +57,7 @@ func (e *EtcdCache) Put(val *mvccpb.KeyValue) {
 	e.cacheMutex.Unlock()
 }
 
-// GetAll returns all cached keys
+// GetAll returns all cached keysaa
 func (e *EtcdCache) GetAll() []*mvccpb.KeyValue {
 	out := []*mvccpb.KeyValue{}
 
@@ -66,4 +66,11 @@ func (e *EtcdCache) GetAll() []*mvccpb.KeyValue {
 	}
 
 	return out
+}
+
+// Invalidate removes a key from cache
+func (e *EtcdCache) Invalidate(key string) {
+	if _, exists := e.cache[key]; exists {
+		delete(e.cache, key)
+	}
 }
