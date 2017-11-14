@@ -31,7 +31,7 @@ func NewForPrefix(prefix string) (*EtcdCache, error) {
 	cache := New()
 	res, err := etcdAPI.Get(context.Background(), prefix, etcd.WithPrefix())
 	if err != nil {
-		return nil, err
+		return cache, err
 	}
 	for _, kv := range res.Kvs {
 		cache.Put(kv)
