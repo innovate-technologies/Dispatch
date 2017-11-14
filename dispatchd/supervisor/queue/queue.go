@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/innovate-technologies/Dispatch/dispatchd/etcdcache"
+
 	"github.com/innovate-technologies/Dispatch/dispatchd/config"
 	"github.com/innovate-technologies/Dispatch/dispatchd/etcdclient"
 	"github.com/innovate-technologies/Dispatch/dispatchd/unit"
@@ -127,12 +129,14 @@ func getMachineForUnitConstraints(u unit.Unit) string {
 		}
 	}
 
+	unitCache, _ := etcdcache.NewForPrefix(fmt.Sprintf("/dispatch/%s/units/", Config.Zone))
+
 	for machine := range machineInfo {
 		goCount := 0
 		unitChan := make(chan unit.Unit)
 		units := []unit.Unit{}
 		for _, unitName := range machineInfo[machine].Units {
-			go getUnit(unitName, unitChan)
+			go getUnit(unitName, unitCache, unitChan)
 			goCount++
 		}
 		for goCount > 0 {
@@ -176,8 +180,8 @@ func getMachineForUnitConstraints(u unit.Unit) string {
 	return lowestLoadMachine
 }
 
-func getUnit(name string, out chan unit.Unit) {
-	out <- unit.NewFromEtcd(name)
+func getUnit(name string, cache *etcdcache.EtcdCache, out chan unit.Unit) {
+	out <- unit.NewFromEtcdWithCache(name, cache)
 }
 
 func assignUnitToMachine(unit, machine string) {
