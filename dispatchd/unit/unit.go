@@ -5,6 +5,8 @@ import (
 	"log"
 	"strings"
 
+	"github.com/innovate-technologies/Dispatch/dispatchd/etcdcache"
+
 	"strconv"
 
 	"github.com/spf13/afero"
@@ -63,11 +65,12 @@ type Unit struct {
 	onEtcd       bool
 	onDisk       bool
 	etcdName     string
+	etcdCache    *etcdcache.EtcdCache
 }
 
 // GetAll returns all units in our zone
 func GetAll() ([]Unit, error) {
-	response, err := EtcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/units", Config.Zone), etcd.WithPrefix())
+	cache, err := etcdcache.NewForPrefix(fmt.Sprintf("/dispatch/%s/units", Config.Zone))
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +78,7 @@ func GetAll() ([]Unit, error) {
 	units := []Unit{}
 	hadUnitNames := map[string]bool{}
 
-	for _, kv := range response.Kvs {
+	for _, kv := range cache.GetAll() {
 		pathParts := strings.Split(string(kv.Key), "/")
 		if _, ok := hadUnitNames[pathParts[4]]; !ok {
 			units = append(units, NewFromEtcd(pathParts[4]))
@@ -90,7 +93,9 @@ func GetAll() ([]Unit, error) {
 // New returns a new Unit
 func New() Unit {
 	setUpDBus()
-	return Unit{}
+	return Unit{
+		etcdCache: etcdcache.New(), // never nil point
+	}
 }
 
 // NewFromEtcd creates a new unit with info from etcd
@@ -100,26 +105,42 @@ func NewFromEtcd(name string) Unit {
 	}
 
 	unit := New()
+	fillFromEtcd(&unit, name)
+
+	return unit
+}
+
+// NewFromEtcdWithCache creates a new unit with info from etcd using a specified cache
+func NewFromEtcdWithCache(name string, cache *etcdcache.EtcdCache) Unit {
+	if !strings.HasSuffix(name, ".service") {
+		name += ".service"
+	}
+	unit := New()
+	unit.etcdCache = cache
+	fillFromEtcd(&unit, name)
+
+	return unit
+}
+
+func fillFromEtcd(unit *Unit, name string) {
 	unit.etcdName = name
 	unit.onEtcd = true
-	unit.Name = getKeyFromEtcd(name, "name")
-	unit.Machine = getKeyFromEtcd(name, "machine")
-	unit.Template = getKeyFromEtcd(name, "template")
-	unit.Global = getKeyFromEtcd(name, "global")
-	unit.UnitContent = getKeyFromEtcd(name, "unit")
-	unit.DesiredState = state.ForString(getKeyFromEtcd(name, "desiredState"))
-	unit.State = state.ForString(getKeyFromEtcd(name, "state"))
+	unit.Name = unit.getKeyFromEtcd("name")
+	unit.Machine = unit.getKeyFromEtcd("machine")
+	unit.Template = unit.getKeyFromEtcd("template")
+	unit.Global = unit.getKeyFromEtcd("global")
+	unit.UnitContent = unit.getKeyFromEtcd("unit")
+	unit.DesiredState = state.ForString(unit.getKeyFromEtcd("desiredState"))
+	unit.State = state.ForString(unit.getKeyFromEtcd("state"))
 
 	unit.Ports = []int64{}
-	portsStringArray := strings.Split(getKeyFromEtcd(name, "ports"), ",")
+	portsStringArray := strings.Split(unit.getKeyFromEtcd("ports"), ",")
 	for _, portString := range portsStringArray {
 		port, err := strconv.ParseInt(portString, 10, 64)
 		if err == nil {
 			unit.Ports = append(unit.Ports, port)
 		}
 	}
-
-	return unit
 }
 
 // Start starts the specific unit
@@ -227,19 +248,19 @@ func (unit *Unit) SaveOnEtcd() {
 
 	log.Println("Saving", unit.Name, "to etcd")
 
-	setKeyOnEtcd(unit.Name, "name", unit.Name)
-	setKeyOnEtcd(unit.Name, "unit", unit.UnitContent)
-	setKeyOnEtcd(unit.Name, "template", unit.Template)
-	setKeyOnEtcd(unit.Name, "desiredState", unit.DesiredState.String())
+	unit.setKeyOnEtcd("name", unit.Name)
+	unit.setKeyOnEtcd("unit", unit.UnitContent)
+	unit.setKeyOnEtcd("template", unit.Template)
+	unit.setKeyOnEtcd("desiredState", unit.DesiredState.String())
 
 	portStrings := []string{}
 	for _, port := range unit.Ports {
 		portStrings = append(portStrings, strconv.FormatInt(port, 10))
 	}
-	setKeyOnEtcd(unit.Name, "ports", strings.Join(portStrings, ","))
+	unit.setKeyOnEtcd("ports", strings.Join(portStrings, ","))
 
 	if unit.Global != "" {
-		setKeyOnEtcd(unit.Name, "global", unit.Global)
+		unit.setKeyOnEtcd("global", unit.Global)
 		EtcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/globals/%s", Config.Zone, unit.Name), unit.Name)
 	}
 
@@ -268,6 +289,7 @@ func (unit *Unit) Destroy() {
 	if unit.Global != "" {
 		EtcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/%s/globals/%s", Config.Zone, unit.Name), etcd.WithPrefix())
 	}
+	unit.etcdCache = etcdcache.New() // clear out all old cache!
 	unit.onEtcd = false
 }
 
@@ -357,16 +379,20 @@ func (unit *Unit) SetDesiredState(s state.State) {
 	EtcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/units/%s/desiredState", Config.Zone, unit.Name), s.String())
 }
 
-func getKeyFromEtcd(unit, key string) string {
-	response, err := EtcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit, key))
+func (unit *Unit) getKeyFromEtcd(key string) string {
+	if kv, err := unit.etcdCache.Get(key); err == nil {
+		return string(kv.Value)
+	}
+	response, err := EtcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, key))
 	if err != nil || response.Count == 0 {
 		return ""
 	}
 	return string(response.Kvs[0].Value)
 }
 
-func setKeyOnEtcd(unit, key, content string) {
-	EtcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit, key), content)
+func (unit *Unit) setKeyOnEtcd(key, content string) {
+	unit.etcdCache.Invalidate(key)
+	EtcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, key), content)
 }
 
 func setUpDBus() {
