@@ -94,3 +94,20 @@ func startUnit(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }
+
+func restartUnit(c echo.Context) error {
+	name := c.Param("name")
+	if name == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"status": "error", "error": "missing name"})
+	}
+	u := unit.NewFromEtcd(name)
+	if u.UnitContent == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"status": "error", "error": "unit does not exist"})
+	}
+	u.SetDesiredState(state.Dead)
+	u.WaitOnState(state.Dead)
+	u.SetDesiredState(state.Active)
+	u.WaitOnState(state.Active)
+
+	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
+}

@@ -38,6 +38,7 @@ func Run() {
 	e.DELETE("/unit/:name", deleteUnit)
 	e.PUT("/unit/:name/start", startUnit)
 	e.PUT("/unit/:name/stop", stopUnit)
+	e.PUT("/unit/:name/restart", restartUnit)
 
 	e.GET("/templates", getTemplates)
 	e.GET("/template/:name", getTemplate)
