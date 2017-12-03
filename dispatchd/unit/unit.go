@@ -93,9 +93,7 @@ func GetAll() ([]Unit, error) {
 // New returns a new Unit
 func New() Unit {
 	setUpDBus()
-	return Unit{
-		etcdCache: etcdcache.New(), // never nil point
-	}
+	return Unit{}
 }
 
 // NewFromEtcd creates a new unit with info from etcd
@@ -380,10 +378,15 @@ func (unit *Unit) SetDesiredState(s state.State) {
 }
 
 func (unit *Unit) getKeyFromEtcd(key string) string {
-	if kv, err := unit.etcdCache.Get(key); err == nil {
-		return string(kv.Value)
+	if unit.etcdCache != nil {
+		if kv, err := unit.etcdCache.Get(key); err == nil {
+			return string(kv.Value)
+		}
 	}
-	response, err := EtcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, key))
+	if unit.etcdName == "" && unit.Name != "" {
+		unit.etcdName = unit.Name
+	}
+	response, err := EtcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.etcdName, key))
 	if err != nil || response.Count == 0 {
 		return ""
 	}
@@ -391,8 +394,13 @@ func (unit *Unit) getKeyFromEtcd(key string) string {
 }
 
 func (unit *Unit) setKeyOnEtcd(key, content string) {
-	unit.etcdCache.Invalidate(key)
-	EtcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.Name, key), content)
+	if unit.etcdCache != nil {
+		unit.etcdCache.Invalidate(key)
+	}
+	if unit.etcdName == "" && unit.Name != "" {
+		unit.etcdName = unit.Name
+	}
+	EtcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.etcdName, key), content)
 }
 
 func setUpDBus() {
