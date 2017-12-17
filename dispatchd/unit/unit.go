@@ -151,14 +151,8 @@ func (unit *Unit) Start() {
 		log.Println("Error starting unit", unit.Name, err)
 		return
 	}
-	result := <-c
-	if result == "done" {
-		log.Println("Started unit", unit.Name)
-		unit.SetState(state.Active)
-	} else {
-		log.Println("Failed starting unit", unit.Name)
-		unit.SetState(state.Dead)
-	}
+	<-c
+	unit.SetState(state.Active)
 }
 
 // Stop stops the unit

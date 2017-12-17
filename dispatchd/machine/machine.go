@@ -6,12 +6,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/innovate-technologies/Dispatch/dispatchd/unit/state"
+
 	"github.com/innovate-technologies/Dispatch/dispatchd/config"
 	"github.com/innovate-technologies/Dispatch/dispatchd/etcdclient"
 	"github.com/innovate-technologies/Dispatch/dispatchd/unit"
 
 	etcd "github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/mvcc/mvccpb"
+	"github.com/coreos/go-systemd/dbus"
 	"golang.org/x/net/context"
 )
 
@@ -20,9 +23,10 @@ var (
 	etcdAPI         = etcdclient.GetEtcdv3()
 	machineLocation string
 	// Config is a pointer need to be set to the main configuration
-	Config     *config.ConfigurationInfo
-	units      map[string]unit.Unit
-	aliveLease *etcd.LeaseGrantResponse
+	Config         *config.ConfigurationInfo
+	units          map[string]unit.Unit
+	aliveLease     *etcd.LeaseGrantResponse
+	dbusConnection *dbus.Conn
 )
 
 // RegisterMachine adds the machine to the cluster
@@ -45,10 +49,19 @@ func RegisterMachine() {
 
 	etcdAPI.Put(ctx, machineLocation+"/alive", "1", etcd.WithLease(aliveLease.ID))
 
+	if dbusConnection == nil {
+		var err error
+		dbusConnection, err = dbus.NewSystemdConnection()
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	go renewAlive()
 	go updateLoad()
 	go startUnits()
 	go checkUnits()
+	go watchLocalUnitState()
 }
 
 func renewAlive() {
@@ -144,6 +157,28 @@ func checkUnits() {
 					unit.Destroy()
 				}
 			}
+		}
+	}
+}
+
+func watchLocalUnitState() {
+	statusChan, errorChan := dbusConnection.SubscribeUnits(5 * time.Second)
+	for {
+		select {
+		case status := <-statusChan:
+			for _, status := range status {
+				if unit, exists := units[status.Name]; exists {
+					if status.ActiveState == "active" {
+						unit.SetState(state.Active)
+					} else {
+						unit.SetState(state.Dead)
+					}
+				}
+			}
+			break
+		case err := <-errorChan:
+			fmt.Println(err) // not sure when this will be the case yet
+			break
 		}
 	}
 }
