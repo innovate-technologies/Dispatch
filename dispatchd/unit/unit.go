@@ -66,6 +66,7 @@ type Unit struct {
 	onDisk       bool
 	etcdName     string
 	etcdCache    *etcdcache.EtcdCache
+	disableCache bool
 }
 
 // GetAll returns all units in our zone
@@ -358,7 +359,7 @@ func (unit *Unit) WaitOnState(s state.State) {
 
 // SetState sets the state of the unit and updates etcd
 func (unit *Unit) SetState(s state.State) {
-	if unit.Global != "" {
+	if unit.Global != "" || !unit.isHealthy() {
 		return
 	}
 	unit.State = s
@@ -369,6 +370,16 @@ func (unit *Unit) SetState(s state.State) {
 func (unit *Unit) SetDesiredState(s state.State) {
 	unit.DesiredState = s
 	EtcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/units/%s/desiredState", Config.Zone, unit.Name), s.String())
+}
+
+func (unit *Unit) isHealthy() bool {
+	unit.disableCache = true
+	name := unit.getKeyFromEtcd("name")
+	if name == "" {
+		unit.Destroy()
+		return false
+	}
+	return true
 }
 
 func (unit *Unit) getKeyFromEtcd(key string) string {

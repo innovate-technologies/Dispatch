@@ -115,10 +115,12 @@ func Test_start(t *testing.T) {
 
 	unit := getTestUnit()
 
+	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/name", Config.Zone, unit.Name)).Return(&etcd.GetResponse{Count: 1, Kvs: []*mvccpb.KeyValue{{Value: []byte(unit.Name)}}}, nil)
 	mockEtcd.EXPECT().Put(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name), "starting")
 
 	mockDBus.EXPECT().StartUnit(unit.Name, "fail", gomock.Any())
 
+	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/name", Config.Zone, unit.Name)).Return(&etcd.GetResponse{Count: 1, Kvs: []*mvccpb.KeyValue{{Value: []byte(unit.Name)}}}, nil)
 	mockEtcd.EXPECT().Put(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name), "active")
 
 	unit.Start()
@@ -132,6 +134,8 @@ func Test_stop(t *testing.T) {
 	defer ctrl2.Finish()
 
 	unit := getTestUnit()
+
+	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/name", Config.Zone, unit.Name)).Return(&etcd.GetResponse{Count: 1, Kvs: []*mvccpb.KeyValue{{Value: []byte(unit.Name)}}}, nil)
 
 	mockDBus.EXPECT().StopUnit(unit.Name, "fail", gomock.Any())
 
@@ -148,6 +152,8 @@ func Test_stopError(t *testing.T) {
 	defer ctrl2.Finish()
 
 	unit := getTestUnit()
+
+	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/name", Config.Zone, unit.Name)).Return(&etcd.GetResponse{Count: 1, Kvs: []*mvccpb.KeyValue{{Value: []byte(unit.Name)}}}, nil)
 
 	mockDBus.EXPECT().StopUnit(unit.Name, "fail", gomock.Any()).Return(0, fmt.Errorf("test"))
 	mockDBus.EXPECT().KillUnit(gomock.Any(), gomock.Any())
@@ -168,12 +174,15 @@ func Test_restart(t *testing.T) {
 
 	mockDBus.EXPECT().StopUnit(unit.Name, "fail", gomock.Any())
 
+	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/name", Config.Zone, unit.Name)).Return(&etcd.GetResponse{Count: 1, Kvs: []*mvccpb.KeyValue{{Value: []byte(unit.Name)}}}, nil)
 	mockEtcd.EXPECT().Put(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name), "dead")
 
+	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/name", Config.Zone, unit.Name)).Return(&etcd.GetResponse{Count: 1, Kvs: []*mvccpb.KeyValue{{Value: []byte(unit.Name)}}}, nil)
 	mockEtcd.EXPECT().Put(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name), "starting")
 
 	mockDBus.EXPECT().StartUnit(unit.Name, "fail", gomock.Any())
 
+	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/name", Config.Zone, unit.Name)).Return(&etcd.GetResponse{Count: 1, Kvs: []*mvccpb.KeyValue{{Value: []byte(unit.Name)}}}, nil)
 	mockEtcd.EXPECT().Put(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name), "active")
 
 	unit.Restart()
@@ -280,6 +289,7 @@ func Test_destroy(t *testing.T) {
 	mockDBus.EXPECT().StopUnit(unit.Name, "fail", gomock.Any())
 	mockDBus.EXPECT().Reload()
 
+	mockEtcd.EXPECT().Get(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/name", Config.Zone, unit.Name)).Return(&etcd.GetResponse{Count: 1, Kvs: []*mvccpb.KeyValue{{Value: []byte(unit.Name)}}}, nil)
 	mockEtcd.EXPECT().Put(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name), "dead")
 
 	mockEtcd.EXPECT().Delete(gomock.Any(), fmt.Sprintf("/dispatch/%s/units/%s", Config.Zone, unit.Name), gomock.Any())
