@@ -273,12 +273,14 @@ func (unit *Unit) Destroy() {
 	}
 
 	unit.Stop() // just making sure
+	fmt.Println("unit stopped for destroy")
 
 	FS.Remove(unitPath + unit.Name)
 	unit.onDisk = false
 	DBusConnection.Reload()
 
 	if unit.Name == "" {
+		fmt.Println("Destroying unit not on etcd")
 		// oopsie
 		unit.onEtcd = false //probably not
 		return
@@ -292,6 +294,7 @@ func (unit *Unit) Destroy() {
 	}
 	unit.etcdCache = etcdcache.New() // clear out all old cache!
 	unit.onEtcd = false
+	fmt.Println("Destroy done")
 }
 
 // LoadAndWatch loads the unit to the system and follows the desired state
@@ -308,13 +311,14 @@ func (unit *Unit) becomeDesiredState() {
 	} else if unit.DesiredState == state.Dead {
 		unit.Stop()
 	} else if unit.DesiredState == state.Destroy {
+		fmt.Println("desiredState: found to be destroy")
 		unit.Destroy()
 	}
 }
 
 // Watch creates and etcd watcher for the desired state of a specific unit
 func (unit *Unit) Watch() {
-	chans := EtcdAPI.Watch(unit.runContext, fmt.Sprintf("/dispatch/%s/units/%s/desiredState", Config.Zone, unit.Name), etcd.WithPrefix())
+	chans := EtcdAPI.Watch(unit.runContext, fmt.Sprintf("/dispatch/%s/units/%s/desiredState", Config.Zone, unit.Name))
 	for resp := range chans {
 		for _, ev := range resp.Events {
 			if ev.IsModify() || ev.IsCreate() {
@@ -326,6 +330,7 @@ func (unit *Unit) Watch() {
 			}
 		}
 	}
+	fmt.Println("End watch for ", unit.Name)
 }
 
 // WaitOnDestroy waits for the unit to enter a destroyed state
@@ -346,7 +351,7 @@ func (unit *Unit) WaitOnState(s state.State) {
 		return
 	}
 
-	chans := EtcdAPI.Watch(context.Background(), fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name), etcd.WithPrefix())
+	chans := EtcdAPI.Watch(context.Background(), fmt.Sprintf("/dispatch/%s/units/%s/state", Config.Zone, unit.Name))
 	for resp := range chans {
 		for _, ev := range resp.Events {
 			if string(ev.Kv.Value) == s.String() {
@@ -375,7 +380,6 @@ func (unit *Unit) isHealthy() bool {
 	unit.disableCache = true
 	name := unit.getKeyFromEtcd("name")
 	if name == "" {
-		unit.Destroy()
 		return false
 	}
 	return true
