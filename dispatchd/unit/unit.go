@@ -281,7 +281,7 @@ func (unit *Unit) Destroy() {
 
 	EtcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/%s/units/%s", Config.Zone, unit.Name), etcd.WithPrefix())
 	EtcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/%s/queue/%s", Config.Zone, unit.Name), etcd.WithPrefix())
-	EtcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/%s/machines/%s/units/%s", Config.Zone, Config.MachineName, unit.Name), etcd.WithPrefix())
+	EtcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/%s/machines/%s/units/%s", Config.Zone, unit.Machine, unit.Name), etcd.WithPrefix())
 	if unit.Global != "" {
 		EtcdAPI.Delete(ctx, fmt.Sprintf("/dispatch/%s/globals/%s", Config.Zone, unit.Name), etcd.WithPrefix())
 	}
