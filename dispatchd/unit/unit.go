@@ -67,6 +67,8 @@ type Unit struct {
 	etcdName     string
 	etcdCache    *etcdcache.EtcdCache
 	disableCache bool
+	runContext   context.Context
+	runCancel    context.CancelFunc
 }
 
 // GetAll returns all units in our zone
@@ -263,6 +265,7 @@ func (unit *Unit) SaveOnEtcd() {
 // Destroy destroys the given unit
 func (unit *Unit) Destroy() {
 	log.Println("Destroying unit", unit.Name)
+	unit.runCancel()
 
 	unit.Stop() // just making sure
 
@@ -288,6 +291,7 @@ func (unit *Unit) Destroy() {
 
 // LoadAndWatch loads the unit to the system and follows the desired state
 func (unit *Unit) LoadAndWatch() {
+	unit.runContext, unit.runCancel = context.WithCancel(context.Background())
 	unit.Create()
 	unit.becomeDesiredState()
 	go unit.Watch()
@@ -306,7 +310,7 @@ func (unit *Unit) becomeDesiredState() {
 
 // Watch creates and etcd watcher for the desired state of a specific unit
 func (unit *Unit) Watch() {
-	chans := EtcdAPI.Watch(context.Background(), fmt.Sprintf("/dispatch/%s/units/%s/desiredState", Config.Zone, unit.Name), etcd.WithPrefix())
+	chans := EtcdAPI.Watch(unit.runContext, fmt.Sprintf("/dispatch/%s/units/%s/desiredState", Config.Zone, unit.Name), etcd.WithPrefix())
 	for resp := range chans {
 		for _, ev := range resp.Events {
 			if ev.IsModify() || ev.IsCreate() {
