@@ -24,7 +24,7 @@ var (
 	machineLocation string
 	// Config is a pointer need to be set to the main configuration
 	Config         *config.ConfigurationInfo
-	units          map[string]unit.Unit
+	units          = map[string]unit.Unit{}
 	aliveLease     *etcd.LeaseGrantResponse
 	dbusConnection *dbus.Conn
 )
@@ -33,8 +33,7 @@ var (
 func RegisterMachine() {
 	unit.KillAllOldUnits() // Starting clean
 
-	unit.Config = Config           // pass through the config
-	units = map[string]unit.Unit{} // initialize map
+	unit.Config = Config // pass through the config
 
 	machineLocation = fmt.Sprintf("/dispatch/%s/machines/%s", Config.Zone, Config.MachineName)
 
