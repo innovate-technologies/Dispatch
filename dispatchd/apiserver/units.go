@@ -53,7 +53,7 @@ func deleteUnit(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"status": "error", "error": "unit does not exist"})
 	}
 
-	if u.Machine == "" || u.Global == "" { // No need to wait here
+	if u.Machine == "" || u.Global != "" { // No need to wait here
 		go u.Destroy()
 	} else {
 		go u.SetDesiredState(state.Destroy)
