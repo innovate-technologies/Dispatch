@@ -5,11 +5,15 @@ services:
     links:
       - etcd
     privileged: true
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
   node2:
     build: ./node
     links:
       - etcd
     privileged: true
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
   etcd:
     image: maartje/etcd-multiarch:amd64-v3.2.7
     environment:

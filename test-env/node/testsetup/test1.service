@@ -1,0 +1,11 @@
+[Unit]
+Description=test1
+
+[Service]
+ExecStart = /bin/bash -c 'docker run --rm --name test1 redis'
+ExecStop = /bin/bash -c 'docker kill test1'
+Restart=always
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target

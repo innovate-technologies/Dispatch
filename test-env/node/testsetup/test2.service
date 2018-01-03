@@ -1,0 +1,11 @@
+[Unit]
+Description=test2
+
+[Service]
+ExecStart = /bin/bash -c 'docker run --rm --name test2 mysql'
+ExecStop = /bin/bash -c 'docker kill test2'
+Restart=always
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target

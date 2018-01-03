@@ -1,0 +1,11 @@
+[Unit]
+Description=test3
+
+[Service]
+ExecStart = /bin/bash -c 'docker run --rm --name test3 httpd'
+ExecStop = /bin/bash -c 'docker kill test3'
+Restart=always
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target
