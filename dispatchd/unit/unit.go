@@ -194,6 +194,8 @@ func (unit *Unit) Create() {
 		}
 		return // can't create file without a name
 	}
+	unit.runContext, unit.runCancel = context.WithCancel(context.Background())
+
 	thisUnitPath := unitPath + unit.Name
 
 	fileContent := []byte(unit.UnitContent)
@@ -265,7 +267,9 @@ func (unit *Unit) SaveOnEtcd() {
 // Destroy destroys the given unit
 func (unit *Unit) Destroy() {
 	log.Println("Destroying unit", unit.Name)
-	unit.runCancel()
+	if unit.runCancel != nil {
+		unit.runCancel()
+	}
 
 	unit.Stop() // just making sure
 
@@ -291,7 +295,6 @@ func (unit *Unit) Destroy() {
 
 // LoadAndWatch loads the unit to the system and follows the desired state
 func (unit *Unit) LoadAndWatch() {
-	unit.runContext, unit.runCancel = context.WithCancel(context.Background())
 	unit.Create()
 	unit.becomeDesiredState()
 	go unit.Watch()
