@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/innovate-technologies/Dispatch/dispatchd/etcdcache"
 
@@ -329,18 +330,9 @@ func (unit *Unit) Watch() {
 
 // WaitOnDestroy waits for the unit to enter a destroyed state
 func (unit *Unit) WaitOnDestroy() {
-	response, err := EtcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/units/%s", Config.Zone, unit.Name), etcd.WithPrefix())
-	if err != nil || response.Count == 0 { // Destroyed already
-		return
-	}
-
-	chans := EtcdAPI.Watch(context.Background(), fmt.Sprintf("/dispatch/%s/units/%s/name", Config.Zone, unit.Name), etcd.WithPrefix())
-	for resp := range chans {
-		for _, ev := range resp.Events {
-			if ev.Type == mvccpb.DELETE {
-				break
-			}
-		}
+	unit.disableCache = true
+	for unit.getKeyFromEtcd("name") != "" {
+		time.Sleep(100 * time.Millisecond)
 	}
 }
 
