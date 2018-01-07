@@ -186,6 +186,7 @@ func (unit *Unit) Restart() {
 
 // Create writes the unit to the disk
 func (unit *Unit) Create() {
+	unit.runContext, unit.runCancel = context.WithCancel(context.Background())
 	if unit.Name == "" {
 		log.Println("Error starting unit with no name")
 		if unit.etcdName != "" {
@@ -195,7 +196,6 @@ func (unit *Unit) Create() {
 		}
 		return // can't create file without a name
 	}
-	unit.runContext, unit.runCancel = context.WithCancel(context.Background())
 
 	thisUnitPath := unitPath + unit.Name
 
