@@ -36,6 +36,10 @@ func Run() {
 
 // AddUnit adds a unit to the queue
 func AddUnit(name string) {
+	response, _ := etcdAPI.Get(ctx, fmt.Sprintf("/dispatch/%s/globals/%s", Config.Zone, name))
+	if response.Count != 0 {
+		return // is global
+	}
 	etcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/queue/%s", Config.Zone, name), name)
 	etcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/units/%s/machine", Config.Zone, name), "")
 }
