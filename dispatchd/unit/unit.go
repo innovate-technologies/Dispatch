@@ -85,7 +85,7 @@ func GetAll() ([]Unit, error) {
 	for _, kv := range cache.GetAll() {
 		pathParts := strings.Split(string(kv.Key), "/")
 		if _, ok := hadUnitNames[pathParts[4]]; !ok {
-			units = append(units, NewFromEtcd(pathParts[4]))
+			units = append(units, NewFromEtcdWithCache(pathParts[4], cache))
 			hadUnitNames[pathParts[4]] = true
 		}
 
