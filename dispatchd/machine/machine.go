@@ -143,8 +143,10 @@ func checkUnits() {
 				if _, ok := units[unitName]; !ok {
 					fmt.Println("Found new unit via check", unitName)
 					u := unit.NewFromEtcd(unitName)
-					go u.LoadAndWatch()
-					units[unitName] = u
+					if u.DesiredState == state.Active {
+						go u.LoadAndWatch()
+						units[unitName] = u
+					}
 				}
 			}
 
