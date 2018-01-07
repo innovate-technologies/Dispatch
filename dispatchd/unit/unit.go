@@ -241,28 +241,33 @@ func (unit *Unit) normalizeName() {
 }
 
 // SaveOnEtcd saves the unit to etcd
-func (unit *Unit) SaveOnEtcd() {
+func (unit *Unit) SaveOnEtcd() error {
+	var err error
 	unit.normalizeName()
 
 	log.Println("Saving", unit.Name, "to etcd")
 
-	unit.setKeyOnEtcd("name", unit.Name)
-	unit.setKeyOnEtcd("unit", unit.UnitContent)
-	unit.setKeyOnEtcd("template", unit.Template)
-	unit.setKeyOnEtcd("desiredState", unit.DesiredState.String())
+	err = doIfErrNil(err, unit.setKeyOnEtcd, "name", unit.Name)
+	err = doIfErrNil(err, unit.setKeyOnEtcd, "unit", unit.UnitContent)
+	err = doIfErrNil(err, unit.setKeyOnEtcd, "template", unit.Template)
+	err = doIfErrNil(err, unit.setKeyOnEtcd, "desiredState", unit.DesiredState.String())
 
 	portStrings := []string{}
 	for _, port := range unit.Ports {
 		portStrings = append(portStrings, strconv.FormatInt(port, 10))
 	}
-	unit.setKeyOnEtcd("ports", strings.Join(portStrings, ","))
+	err = doIfErrNil(err, unit.setKeyOnEtcd, "ports", strings.Join(portStrings, ","))
 
 	if unit.Global != "" {
 		unit.setKeyOnEtcd("global", unit.Global)
-		EtcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/globals/%s", Config.Zone, unit.Name), unit.Name)
+		_, err = EtcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/globals/%s", Config.Zone, unit.Name), unit.Name)
 	}
 
+	if err != nil {
+		return err
+	}
 	unit.onEtcd = true
+	return nil
 }
 
 // Destroy destroys the given unit
@@ -401,14 +406,15 @@ func (unit *Unit) getKeyFromEtcd(key string) string {
 	return string(response.Kvs[0].Value)
 }
 
-func (unit *Unit) setKeyOnEtcd(key, content string) {
+func (unit *Unit) setKeyOnEtcd(key, content string) error {
 	if unit.etcdCache != nil {
 		unit.etcdCache.Invalidate(key)
 	}
 	if unit.etcdName == "" && unit.Name != "" {
 		unit.etcdName = unit.Name
 	}
-	EtcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.etcdName, key), content)
+	_, err := EtcdAPI.Put(ctx, fmt.Sprintf("/dispatch/%s/units/%s/%s", Config.Zone, unit.etcdName, key), content)
+	return err
 }
 
 func setUpDBus() {
@@ -437,4 +443,12 @@ func KillAllOldUnits() {
 	}
 
 	DBusConnection.Reload()
+}
+
+func doIfErrNil(err error, f func(string, string) error, s1, s2 string) error {
+	if err != nil {
+		return err
+	}
+	err = f(s1, s2)
+	return err
 }

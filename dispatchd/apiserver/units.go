@@ -38,7 +38,10 @@ func postUnit(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"status": "error", "error": "unit already exists"})
 	}
 
-	u.SaveOnEtcd()
+	err := u.SaveOnEtcd()
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"status": "error", "error": err.Error()})
+	}
 	u.PutOnQueue()
 	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }
