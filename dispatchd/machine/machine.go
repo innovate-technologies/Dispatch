@@ -84,7 +84,7 @@ func updateLoad() {
 			load := strings.Split(textAfterLoadAverage, ",")[0] //to do: divide #CPU
 			etcdAPI.Put(ctx, machineLocation+"/load", load)
 		}
-		time.Sleep(1 * time.Second)
+		time.Sleep(5 * time.Second)
 	}
 }
 
